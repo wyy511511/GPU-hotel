@@ -112,6 +112,9 @@ button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px s
 .lob .cnt { font-family: var(--display); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .sad { margin: .4rem 0 0; font-size: .82rem; color: var(--bad); font-weight: 800; }
 canvas { width: 100%; height: 120px; display: block; }
+canvas.scene { height: auto; image-rendering: pixelated; image-rendering: crisp-edges; border-radius: 16px; border: 3px solid var(--wall-d); background: #f4f0ff; }
+.lobsum { display: flex; flex-wrap: wrap; gap: .4rem .9rem; margin-top: .6rem; font-size: .85rem; font-weight: 800; }
+.lobsum span { display: inline-flex; align-items: center; gap: .35rem; }
 
 /* desk / shelf */
 .mrow { padding: .6rem .7rem; border: 2px solid var(--line); border-left: 6px solid var(--c); border-radius: 14px; margin-bottom: .55rem; }
@@ -229,7 +232,7 @@ table.rep { border-collapse: collapse; width: 100%; font-size: .92rem; }
             <div class="legend" id="legend"></div>
             <div class="ticker" id="ticker" aria-live="polite"></div>
           </div>
-          <div class="panel"><h2 id="t-lobby"></h2><div id="lobby"></div><p class="sad" id="sad"></p></div>
+          <div class="panel"><h2 id="t-lobby"></h2><canvas class="scene" id="lobbyScene" width="240" height="102" data-i18n-aria="lobby"></canvas><div class="lobsum" id="lobby"></div><p class="hint" id="sceneNote"></p><p class="sad" id="sad"></p></div>
           <div class="panel"><h2 id="t-chart"></h2><canvas id="chart" width="900" height="240"></canvas></div>
           <div class="panel" id="custPanel"><h2 id="t-cust"></h2><div style="overflow-x:auto"><table class="tab" id="ctab"></table></div><p class="hint" id="custHint"></p></div>
         </div>
@@ -918,6 +921,11 @@ zh: {
 },
 };
 for (const k in EZ) Object.assign(L[k], EZ[k]);
+Object.assign(L.en, { scene_note: 'Angry guests (#@%!) are about to walk out. Fancy guests ($$$) happily pay busy-hour prices. Runners are part of a sudden rush.' });
+Object.assign(L.es, { scene_note: 'Los huéspedes enfadados (#@%!) están a punto de irse. Los elegantes ($$$) pagan encantados el precio de hora punta. Los que corren llegan en una avalancha repentina.' });
+Object.assign(L.fr, { scene_note: 'Les clients fâchés (#@%!) sont sur le point de partir. Les clients chics ($$$) paient volontiers le prix des heures de pointe. Ceux qui courent font partie d’une vague soudaine.' });
+Object.assign(L.tr, { scene_note: 'Kızgın misafirler (#@%!) gitmek üzere. Şık misafirler ($$$) yoğun saat fiyatını seve seve öder. Koşanlar ani bir kalabalığın parçası.' });
+Object.assign(L.zh, { scene_note: '生气的客人（#@%!）马上就要走了；土豪客人（$$$）乐意多付旺时价；奔跑的客人说明突然来了一波人潮。' });
 
 const LANGS = [['en', 'EN', 'English'], ['es', 'ES', 'Español'], ['fr', 'FR', 'Français'], ['tr', 'TR', 'Türkçe'], ['zh', 'ZH', '中文']];
 let lang = 'en', MODE = null;
@@ -1076,7 +1084,7 @@ function serve(m, r, latency, mult) {
   const K = D.kc[k]; K.paid += list * pm; K.rev += rev; K[m.cat].s += list;
   const L0 = lat[m.id]; if (L0.length < 3000) L0.push(latency); else L0[Math.floor(Math.random() * 3000)] = latency;
 }
-function lose(m, r) { const v = listPrice(m); D.lostV += v; D.lostN++; D.kc[r.k][m.cat].l += v; }
+function lose(m, r) { const v = listPrice(m); D.lostV += v; D.lostN++; D.kc[r.k][m.cat].l += v; if (typeof sceneLeave === 'function' && !window.__headless) sceneLeave(m.cat, r); }
 function step() {
   t++; D.t++;
   const d = D.t / DAY;
@@ -1218,7 +1226,7 @@ function morning() {
       const wip = CATALOG.filter(m => G.turbo[m.id] && G.day < G.turbo[m.id]);
       if (turboable.length || wip.length) projHtml = `<h3>${T('proj')}</h3><div class="opts">${turboable.map(m => `<button class="opt" data-tb="${m.id}" ${G.cash < TURBO_COST ? 'disabled' : ''}><b>${T('turbo', { m: m.name, lab: m.lab })}</b><small>${T('turbo_d')}</small><span class="cost">${money(TURBO_COST)}</span></button>`).join('')}${wip.map(m => `<button class="opt picked" disabled><b>${T('turbo', { m: m.name, lab: m.lab })}</b><small>${T('turbo_wip', { d: G.turbo[m.id] })}</small></button>`).join('')}</div>`;
     }
-    $('card').innerHTML = `<div class="eyebrow">${T('m_eyebrow', { d: G.day, n: DAYS })}</div><h2>${tx.t}</h2><p>${tx.x}</p>${tx.s ? `<p class="src">${tx.s}</p>` : ''}
+    $('card').innerHTML = `<canvas class="scene" id="cardScene" width="240" height="102" aria-hidden="true"></canvas><div class="eyebrow">${T('m_eyebrow', { d: G.day, n: DAYS })}</div><h2>${tx.t}</h2><p>${tx.x}</p>${tx.s ? `<p class="src">${tx.s}</p>` : ''}
       ${choices ? `<h3>${T('decide')}</h3><div class="opts">${choices.map((c, k) => `<button class="opt ${chosen === k ? 'picked' : ''}" data-c="${k}" ${chosen !== false ? 'disabled' : ''}><b>${tx.c[k][0]}</b><small>${tx.c[k][1]}</small></button>`).join('')}</div>` : ''}
       ${shelfHtml}${projHtml}
       <h3>${T('shop', { c: money(G.cash) })}</h3><div class="opts">${offers.length ? offers.map(u => `<button class="opt ${G.up[u.id] ? 'picked' : ''}" data-u="${u.id}" ${G.up[u.id] || G.cash < u.cost ? 'disabled' : ''}><b>${ux[u.id][0]}</b><small>${ux[u.id][1]}</small><span class="cost">${G.up[u.id] ? T('owned_tag') : money(u.cost)}</span></button>`).join('') : `<p class="hint">${T('allbought')}</p>`}</div>
@@ -1377,7 +1385,7 @@ function applyLang() {
     ['lg_busy', 'background:var(--pink);border-radius:50%'], ['lg_down', 'background:repeating-linear-gradient(45deg,#b9b6cf 0 3px,#d8d5ea 3px 6px)'], ['lg_slow', 'background:var(--lamp);box-shadow:inset 0 0 0 2px var(--bad)']];
   if (MODE === 'pro') legend.push(['lg_tb', 'background:var(--gold);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)']);
   $('legend').innerHTML = CK.map(c => `<span><i style="background:var(--${c});border-radius:50%"></i>${catName(c)}</span>`).join('') + legend.map(([k, st]) => `<span><i style="${st}"></i>${T(k)}</span>`).join('');
-  $('t-lobby').textContent = T('lobby'); $('t-chart').textContent = T('chart'); $('t-policy').textContent = T('policy'); $('t-owned').textContent = T('owned');
+  $('t-lobby').textContent = T('lobby'); $('sceneNote').textContent = T('scene_note'); $('t-chart').textContent = T('chart'); $('t-policy').textContent = T('policy'); $('t-owned').textContent = T('owned');
   $('l-keep').textContent = T('keep'); $('l-win').textContent = T('win'); $('l-surge').textContent = T('surge'); $('l-order').textContent = T('order');
   $('o-fifo').textContent = T('o_fifo'); $('o-rich').textContent = T('o_rich'); $('o-short').textContent = T('o_short');
   $('burst').textContent = T('burst'); $('limit').textContent = T('limit');
@@ -1410,14 +1418,8 @@ function drawChart() {
   cx.beginPath(); chart.forEach((h, i) => cx.lineTo(x(i), y(h[h.length - 1]))); cx.strokeStyle = css('--btn'); cx.setLineDash([8, 7]); cx.lineWidth = 3; cx.stroke(); cx.setLineDash([]);
 }
 function renderLobby() {
-  const groups = MODE === 'easy'
-    ? CATALOG.map(m => ({ c: m.cat, q: Q[m.id] || [] }))
-    : CK.map(c => ({ c, q: [].concat(...CATALOG.filter(m => m.cat === c && isListed(m)).map(m => Q[m.id] || [])) }));
-  $('lobby').innerHTML = groups.map(gr => {
-    const pat = CATS[gr.c].pat, n = gr.q.length, show = Math.min(n, 18);
-    let blobs = ''; for (let i = 0; i < show; i++) blobs += `<span class="g ${t - gr.q[i].t > .6 * pat ? 'mad' : ''}"></span>`;
-    return `<div class="lob" style="--c:var(--${gr.c})"><div class="nm"><span class="dot"></span>${catName(gr.c)}</div><div class="line">${blobs}${n > show ? `<span class="more">+${n - show}</span>` : ''}</div><div class="cnt">${T('lobby_n', { n })}</div></div>`;
-  }).join('');
+  const lanes = liveLanes(), full = MODE === 'easy' ? lanes : CK.map(c => ({ c, n: CATALOG.filter(m => m.cat === c && isListed(m)).reduce((x, m) => x + (Q[m.id] || []).length, 0) }));
+  $('lobby').innerHTML = full.map(l => `<span style="--c:var(--${l.c})"><i class="dot"></i>${catName(l.c)} · ${T('lobby_n', { n: l.n != null ? l.n : l.q.length })}</span>`).join('');
   $('sad').textContent = D.lostN ? T('left_n', { n: D.lostN.toLocaleString('en-US') }) : '';
 }
 function renderCust() {
@@ -1469,6 +1471,7 @@ function startGame(mode) {
   initMode(mode); t = 0; lastSay = null; running = false;
   $('start').hidden = true; $('game').hidden = false; $('newgame').hidden = false;
   $('keep').value = 60; $('win').value = 20; $('surge').value = 100; $('policy').value = 'fifo';
+  for (const c of CK) sceneCol[c] = css('--' + c); demo.lanes = null;
   buildGrid(); applyLang(); morning();
 }
 document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => startGame(b.dataset.mode));
@@ -1479,11 +1482,149 @@ $('newgame').onclick = () => location.reload();
   const fill = (id, cats) => { $(id).innerHTML = pat.flat().map((c, i) => c ? `<span class="w busy ${cats[i % cats.length] || c}" style="aspect-ratio:auto"><i></i></span>` : `<span></span>`).join(''); };
   fill('mini1', ['chat', 'img', 'vid']); fill('mini2', ['img', 'vid', 'aud']);
 })();
+// ================= pixel lobby scene =================
+const SW = 240, LANE_H = 28, TOP_H = 16;
+const FONT = {
+  '#': ['101', '111', '101', '111', '101'], '@': ['111', '101', '111', '100', '111'], '%': ['101', '001', '010', '100', '101'], '!': ['010', '010', '010', '000', '010'],
+  '&': ['010', '101', '010', '101', '011'], '*': ['000', '101', '010', '101', '000'], '?': ['111', '001', '010', '000', '010'], '+': ['000', '010', '111', '010', '000'],
+  '$': ['010', '111', '100', '111', '001', '111', '010'],
+  '0': ['111', '101', '101', '101', '111'], '1': ['010', '110', '010', '010', '111'], '2': ['111', '001', '111', '100', '111'], '3': ['111', '001', '111', '001', '111'], '4': ['101', '101', '111', '001', '001'],
+  '5': ['111', '100', '111', '001', '111'], '6': ['111', '100', '111', '101', '111'], '7': ['111', '001', '010', '010', '010'], '8': ['111', '101', '111', '101', '111'], '9': ['111', '101', '111', '001', '111'],
+  G: ['111', '100', '101', '101', '111'], P: ['111', '101', '111', '100', '100'], U: ['101', '101', '101', '101', '111'], H: ['101', '101', '111', '101', '101'], O: ['111', '101', '101', '101', '111'],
+  T: ['111', '010', '010', '010', '010'], E: ['111', '100', '111', '100', '111'], L: ['100', '100', '100', '100', '111'], ' ': ['000', '000', '000', '000', '000'],
+};
+const BODY = ['..hhhh..', '.hhhhhh.', '.hssssh.', '.sesses.', '.ssssss.', '..smms..', '.cccccc.', 'cccccccc', 's.cccc.s', '..cccc..'];
+const LEGS = { idle: ['..pppp..', '..p..p..', '..p..p..', '.kk..kk.'], walk: ['..pppp..', '.pp..pp.', '.p....p.', 'kk....kk'], runA: ['..pppp..', '.pp..pp.', 'pp....pp', 'k......k'], runB: ['..pppp..', '..pppp..', '..pp.p..', '..kk.kk.'] };
+const HAT = ['..KKKK..', '..KKKK..', '..gggg..', '.KKKKKK.'];
+const CLERK = ['...hh...', '..hhhh..', '.hhhhhh.', '.hssssh.', '.sesses.', '.ssssss.', '..smms..', '.wwrrww.', 'wwwwwwww', 'wwwwwwww'];
+const GARBLE = ['#@%!', '&*!?', '!#@$', '%&#!', '@!*#'];
+const HAIRS = ['#5b3a29', '#2f2b52', '#c0702e', '#e8b04a', '#8b5cf6', '#3b2f2f'];
+const SKINS = ['#ffd9b3', '#f2c094', '#d49a6a', '#a86b48', '#ffe4c9'];
+const REDUCE = (() => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } })();
+const sprite = new WeakMap();
+const lostSet = new WeakSet();
+let leavers = [], frameNo = 0, dings = {}, lastHead = {}, sceneCol = {};
+const seedOf = r => { let s = sprite.get(r); if (!s) { s = { x: SW + 10 + Math.random() * 20, seed: Math.random(), run: false, fresh: true }; sprite.set(r, s); } return s; };
+function px(ctx, x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); }
+function drawRows(ctx, rows, x, y, pal) { rows.forEach((row, j) => { for (let i = 0; i < row.length; i++) { const c = pal[row[i]]; if (c) px(ctx, x + i, y + j, 1, 1, c); } }); }
+function text(ctx, s, x, y, col) { let cx = x; for (const ch of s) { const g = FONT[ch] || FONT[' ']; const top = y + (g.length === 7 ? -1 : 0); g.forEach((row, j) => { for (let i = 0; i < 3; i++) if (row[i] === '1') px(ctx, cx + i, top + j, 1, 1, col); }); cx += 4; } return cx - x; }
+function bubble(ctx, x, y, s, border, ink) {
+  const w = s.length * 4 + 3, h = 9;
+  px(ctx, x, y, w, h, border); px(ctx, x + 1, y + 1, w - 2, h - 2, '#ffffff'); px(ctx, x + 1, y + h, 2, 1, border); px(ctx, x, y + h + 1, 1, 1, border);
+  text(ctx, s, x + 2, y + 2, ink);
+}
+function person(ctx, x, y, o) {
+  const pal = { h: o.hair, s: o.skin, e: '#2f2b52', m: o.mood === 'angry' ? '#7a1d2a' : '#c46a6a', c: o.shirt, p: '#4a4775', k: '#2f2b52' };
+  if (o.mood === 'angry') { pal.s = '#ff9e94'; pal.m = '#7a1d2a'; }
+  const bob = !REDUCE && o.pose === 'idle' && ((frameNo + o.phase) % 16 < 8) ? 0 : 0;
+  const shake = !REDUCE && o.mood === 'angry' && o.pose === 'idle' ? ((frameNo + o.phase) % 4 < 2 ? -1 : 1) : 0;
+  const lx = x + shake, ly = y + bob;
+  let body = BODY;
+  if (o.mood === 'angry') body = body.map((r, j) => j === 2 ? '.hKssKh.' : j === 5 ? '..mmmm..' : r);
+  if (o.mood === 'rich') body = body.map((r, j) => j === 7 ? 'ccgcgccs' : j === 8 ? 's.cccc..' : r);
+  drawRows(ctx, body, lx, ly, { ...pal, K: '#2f2b52', g: '#ffc53d' });
+  const legs = o.pose === 'run' ? (REDUCE || frameNo % 4 < 2 ? LEGS.runA : LEGS.runB) : o.pose === 'walk' ? (REDUCE || frameNo % 6 < 3 ? LEGS.walk : LEGS.idle) : LEGS.idle;
+  drawRows(ctx, legs, lx, ly + 10, pal);
+  if (o.mood === 'rich') {
+    drawRows(ctx, HAT, lx, ly - 3, { K: '#2f2b52', g: '#ffc53d' });
+    const wave = !REDUCE && frameNo % 8 < 4 ? -1 : 0;
+    px(ctx, lx + 8, ly + 5 + wave, 4, 3, '#3cb371'); px(ctx, lx + 9, ly + 6 + wave, 2, 1, '#bdf5d0');
+  }
+  if (o.pose === 'run') { for (const [dy, len] of [[6, 4], [8, 6], [11, 3]]) px(ctx, lx + 10 + (frameNo % 2), ly + dy, len, 1, 'rgba(122,127,255,.55)'); if (frameNo % 3 === 0) px(ctx, lx + 9, ly + 13, 2, 1, '#cfc8ee'); }
+  if (o.mood === 'angry') {
+    if (!REDUCE && frameNo % 6 < 3) { px(ctx, lx + 1, ly - 2, 1, 1, '#ff5d6c'); px(ctx, lx + 6, ly - 3, 1, 1, '#ff5d6c'); }
+    bubble(ctx, lx + 5, ly - 13, GARBLE[Math.floor((frameNo + o.phase) / 6) % GARBLE.length], '#ff5d6c', '#e0283d');
+  } else if (o.mood === 'rich') bubble(ctx, lx + 6, ly - 15, (frameNo + o.phase) % 24 < 16 ? '$$$' : '+$', '#ffad1f', '#1f9e5a');
+  else if (o.mood === 'dollar' && (frameNo + o.phase) % 40 < 24) bubble(ctx, lx + 5, ly - 12, '$', '#1fae6a', '#1f9e5a');
+}
+function sceneBg(ctx, n, H) {
+  px(ctx, 0, 0, SW, TOP_H, '#ffe3ee'); for (let x = 2; x < SW; x += 7) px(ctx, x, 0, 2, TOP_H, '#ffd2e2');
+  px(ctx, 0, TOP_H - 2, SW, 2, '#f8c3d6');
+  for (let y = TOP_H; y < H; y += 7) for (let x = 0; x < SW; x += 7) px(ctx, x, y, 7, 7, ((x + y) / 7) % 2 < 1 ? '#f4f0ff' : '#e8e2fb');
+  const label = 'GPU HOTEL', w = label.length * 4 + 5, sx = Math.round(SW / 2 - w / 2);
+  px(ctx, sx, 3, w, 9, '#ff86ad'); px(ctx, sx, 11, w, 1, '#e0628c'); text(ctx, label, sx + 3, 5, '#ffffff');
+  for (const lx of [16, SW - 18]) { px(ctx, lx, 4, 6, 7, '#ffffff'); px(ctx, lx + 1, 5, 4, 5, '#7a7fff'); px(ctx, lx + 2, 6, 2, 2, '#ffc94d'); }
+}
+function laneBase(li) { return TOP_H + li * LANE_H + 25; }
+function deskAt(ctx, li, col, ding) {
+  const b = laneBase(li);
+  drawRows(ctx, CLERK, 9, b - 22, { h: '#5b3a29', s: '#ffd9b3', e: '#2f2b52', m: '#c46a6a', w: '#ffffff', r: '#ff5d6c' });
+  px(ctx, 2, b - 12, 30, 12, '#c98d5a'); px(ctx, 2, b - 12, 30, 2, '#e3a873'); px(ctx, 2, b - 6, 30, 2, col); px(ctx, 2, b - 1, 30, 1, '#a66b3f');
+  px(ctx, 25, b - 14, 4, 2, '#ffc53d'); px(ctx, 26, b - 15, 2, 1, '#ffc53d');
+  if (ding) { px(ctx, 27, b - 19, 1, 2, '#ffad1f'); px(ctx, 30, b - 17, 2, 1, '#ffad1f'); px(ctx, 23, b - 17, 2, 1, '#ffad1f'); }
+  for (let x = 36; x < SW - 2; x += 34) { px(ctx, x, b - 6, 2, 7, '#f2b134'); px(ctx, x - 1, b - 7, 4, 2, '#ffd36b'); }
+  for (let x = 36; x < SW - 2; x++) px(ctx, x, b - 4 + (Math.abs(((x - 36) % 34) - 17) < 9 ? 1 : 0), 1, 1, '#e25b7a');
+}
+// lanes: [{ c, q: [requests in order], pat }]
+function drawLobbyScene(cv, lanes, nowT, gusting) {
+  const H = TOP_H + lanes.length * LANE_H + 2;
+  if (cv.height !== H) cv.height = H;
+  const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
+  sceneBg(ctx, lanes.length, H);
+  lanes.forEach((ln, li) => {
+    const b = laneBase(li), col = sceneCol[ln.c] || '#7a7fff';
+    const head = ln.q[0];
+    if (lastHead[li] && lastHead[li] !== head && !lostSet.has(lastHead[li])) dings[li] = frameNo + 5;
+    lastHead[li] = head;
+    deskAt(ctx, li, col, dings[li] > frameNo);
+    const show = Math.min(ln.q.length, 14);
+    for (let i = show - 1; i >= 0; i--) {
+      const r = ln.q[i], s = seedOf(r), target = 38 + i * 13;
+      if (s.fresh) { s.fresh = false; s.run = r.demo === 'run' || s.seed > .86 || !!gusting(ln.c); if (!s.run) s.x = Math.min(s.x, target + 26); s.hair = HAIRS[Math.floor(s.seed * 97) % HAIRS.length]; s.skin = SKINS[Math.floor(s.seed * 61) % SKINS.length]; s.phase = Math.floor(s.seed * 50); }
+      const dx = target - s.x, sp = s.run ? 7 : 2.5;
+      let pose = 'idle'; if (Math.abs(dx) > .5) { s.x += Math.sign(dx) * Math.min(Math.abs(dx), sp); pose = s.run ? 'run' : 'walk'; } else s.run = false;
+      const wait = nowT - r.t, mood = r.demo && r.demo !== 'run' ? r.demo : wait > .6 * ln.pat ? 'angry' : s.seed < .12 ? 'rich' : s.seed < .34 ? 'dollar' : 'plain';
+      person(ctx, s.x, b - 14, { shirt: col, hair: s.hair, skin: s.skin, mood, pose, phase: s.phase });
+    }
+    if (ln.q.length > show) { const t2 = '+' + (ln.q.length - show); text(ctx, t2, SW - 3 - t2.length * 4, b - 9, '#2f2b52'); }
+  });
+  leavers = leavers.filter(l => l.x < SW + 12);
+  for (const l of leavers) { if (l.li >= lanes.length) continue; l.x += 1.6; person(ctx, l.x, laneBase(l.li) - 14, { shirt: l.col, hair: l.hair, skin: l.skin, mood: 'angry', pose: 'walk', phase: l.phase }); }
+}
+function sceneLeave(cat, r) {
+  lostSet.add(r);
+  if (leavers.length > 10) return;
+  const li = CK.indexOf(cat); if (li < 0) return;
+  const s = sprite.get(r); if (!s || s.x > SW) return;
+  leavers.push({ li, x: s.x, col: sceneCol[cat], hair: s.hair || HAIRS[0], skin: s.skin || SKINS[0], phase: s.phase || 0 });
+}
+// demo crowd for the morning card
+const demo = { lanes: null, clock: 0 };
+function demoLanes() {
+  if (!demo.lanes || demo.mode !== MODE) {
+    demo.mode = MODE;
+    const kinds = [['angry', 'dollar', 'plain', 'rich', 'plain', 'dollar'], ['rich', 'plain', 'angry', 'dollar', 'plain'], ['plain', 'dollar', 'rich', 'plain', 'angry', 'plain', 'dollar']];
+    demo.lanes = CK.map((c, li) => ({ c, pat: 1e9, q: kinds[li % 3].map(k => ({ t: 0, demo: k })) }));
+  }
+  demo.clock++;
+  if (demo.clock % 22 === 0) {
+    const ln = demo.lanes[Math.floor(Math.random() * demo.lanes.length)];
+    const roll = Math.random();
+    if (roll < .45 && ln.q.length > 3) ln.q.shift();
+    else if (roll < .7 && ln.q.length > 3) { const i = ln.q.findIndex(r => r.demo === 'angry'); if (i >= 0) { const [r] = ln.q.splice(i, 1); sceneLeave(ln.c, r); } }
+    if (ln.q.length < 9) ln.q.push({ t: 0, demo: Math.random() < .5 ? 'run' : ['plain', 'dollar', 'rich', 'angry'][Math.floor(Math.random() * 4)] });
+  }
+  return demo.lanes;
+}
+function liveLanes() {
+  if (MODE === 'easy') return CATALOG.map(m => ({ c: m.cat, q: Q[m.id] || [], pat: CATS[m.cat].pat }));
+  return CK.map(c => ({ c, pat: CATS[c].pat, q: [].concat(...CATALOG.filter(m => m.cat === c && isListed(m)).map(m => Q[m.id] || [])).sort((a, b) => a.t - b.t).slice(0, 30) }));
+}
+let lastSceneTs = 0;
+function sceneLoop(ts) {
+  requestAnimationFrame(sceneLoop);
+  if (ts - lastSceneTs < 70 || !MODE) return; lastSceneTs = ts; frameNo++;
+  const card = document.getElementById('cardScene');
+  if (card && !$('veil').hidden) drawLobbyScene(card, demoLanes(), 0, () => false);
+  else if (D && !$('game').hidden) drawLobbyScene($('lobbyScene'), liveLanes(), t, c => D.gust && D.gust[c] > t);
+}
+requestAnimationFrame(sceneLoop);
+
 setInterval(() => { if (!paused && running) for (let i = 0; i < speed && running; i++) step(); }, 80);
 setInterval(render, 200);
 // headless balance hook
 window.__auto = (mode, o = {}) => {
-  initMode(mode); newDay();
+  window.__headless = true; initMode(mode); newDay();
   for (; G.day <= DAYS; G.day++) {
     setupDay();
     for (const m of CATALOG) if (o.listAll && G.day >= availDay(m) && !removed(m) && !isListed(m) && !(o.skip || []).includes(m.id)) setListed(m, true);
