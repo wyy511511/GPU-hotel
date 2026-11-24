@@ -1,0 +1,1152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GPU Hotel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: hotel facade (one window per GPU) plus customers on the left; the model shelf (one API key) and house policy on the right; morning briefings as cards; language picker pinned top-right above the cards. Single dark look by choice. */
+:root {
+  color-scheme: dark;
+  --bg: #0c111d; --panel: #141b2c; --panel2: #1a2338; --fg: #e8ebf3; --muted: #8d97ae; --rule: #28324a;
+  --off: #1d2540; --gold: #f2b84b; --img: #4fd1c5; --vid: #f0709a; --aud: #f5c15c; --closed: #9d8cf5; --bad: #ff6b5e; --good: #7bd88f;
+  --num: "Space Grotesk", "Inter", "Noto Sans SC", system-ui, sans-serif;
+  --body: "Inter", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.6;
+  padding-block: .75rem 3rem; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 74rem; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+.topbar { display: flex; justify-content: flex-end; position: relative; z-index: 30; }
+.lang { position: relative; }
+#langBtn { display: inline-flex; align-items: center; gap: .55rem; padding: .3rem .7rem; }
+#langBtn .code { font-family: var(--num); font-weight: 700; color: var(--gold); letter-spacing: .06em; }
+#langBtn .caret { color: var(--muted); font-size: .7rem; }
+.menu { position: absolute; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: .3rem; min-width: 11rem; display: flex; flex-direction: column; gap: 2px; box-shadow: 0 10px 28px rgba(0, 0, 0, .45); }
+.menu[hidden] { display: none; }
+.menu button { width: 100%; text-align: left; background: transparent; border-color: transparent; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.menu button:hover { background: var(--panel2); }
+.menu button[aria-checked="true"] { color: var(--gold); font-weight: 700; }
+.menu button small { color: var(--muted); font-family: var(--num); font-weight: 500; }
+header { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; align-items: flex-end; justify-content: space-between; }
+h1 { font-family: var(--num); font-size: 1.75rem; line-height: 1.1; margin: 0; letter-spacing: .02em; color: var(--gold); text-shadow: 0 0 18px color-mix(in srgb, var(--gold) 45%, transparent); }
+h1 span { font-family: var(--body); font-size: .95rem; color: var(--fg); font-weight: 500; text-shadow: none; margin-left: .6rem; letter-spacing: 0; }
+.sub { margin: .25rem 0 0; color: var(--muted); max-width: 44rem; }
+.bar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+button, select { font: inherit; color: var(--fg); background: var(--panel2); border: 1px solid var(--rule); border-radius: 4px; padding: .35rem .7rem; cursor: pointer; }
+button:hover:not(:disabled) { border-color: var(--gold); }
+button:disabled { opacity: .45; cursor: default; }
+button[aria-pressed="true"], button.primary { background: var(--gold); color: #1a1405; border-color: var(--gold); font-weight: 700; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: .5rem; }
+.kpi { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: .55rem .8rem; min-width: 0; }
+.kpi b { display: block; font-family: var(--num); font-size: 1.3rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.kpi span { color: var(--muted); font-size: .78rem; line-height: 1.35; display: block; }
+.neg { color: var(--bad); } .pos { color: var(--good); } .warn { color: var(--gold); }
+.dayline { height: 6px; background: var(--off); border-radius: 3px; overflow: hidden; }
+.dayline i { display: block; height: 100%; width: 0; background: var(--gold); }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 1rem; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: .9rem 1rem; min-width: 0; }
+.panel h2 { font-size: .8rem; letter-spacing: .06em; color: var(--muted); font-weight: 500; margin: 0 0 .7rem; }
+.facade { background: linear-gradient(#10172a, #0e1424); border: 1px solid var(--rule); border-top: 4px solid var(--gold); border-radius: 4px 4px 0 0; padding: .9rem; }
+.grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.w { aspect-ratio: 1 / .9; border-radius: 2px; background: var(--off); transition: background .2s; }
+.w.img { --c: var(--img); } .w.vid { --c: var(--vid); } .w.aud { --c: var(--aud); }
+.w.idle { background: color-mix(in srgb, var(--c) 26%, var(--off)); }
+.w.busy { background: var(--c); box-shadow: 0 0 9px color-mix(in srgb, var(--c) 70%, transparent); }
+.w.lane { opacity: .7; box-shadow: none; }
+.w.loading { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--c) 60%, var(--off)) 0 4px, var(--off) 4px 8px); animation: flick .7s steps(2) infinite; }
+.w.down { background: repeating-linear-gradient(45deg, color-mix(in srgb, var(--bad) 55%, var(--off)) 0 3px, #120a10 3px 6px); }
+.w.slow { outline: 1px solid var(--bad); outline-offset: 1px; }
+.w.tb { outline: 1px solid var(--gold); outline-offset: 1px; }
+.w.burst { outline: 1px dashed var(--gold); outline-offset: 1px; }
+@keyframes flick { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .w.loading { animation: none; } .w { transition: none; } }
+.legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; color: var(--muted); font-size: .78rem; }
+.legend i { display: inline-block; width: .8rem; height: .8rem; border-radius: 2px; vertical-align: -1px; margin-right: .35rem; }
+.ticker { min-height: 1.5rem; color: var(--gold); font-size: .85rem; margin-top: .6rem; }
+canvas { width: 100%; height: 120px; display: block; }
+.catgrp { border-top: 1px solid var(--rule); padding-top: .6rem; margin-top: .6rem; }
+.catgrp:first-of-type { border-top: 0; padding-top: 0; margin-top: 0; }
+.catgrp > h3 { font-size: .78rem; letter-spacing: .06em; margin: 0 0 .4rem; color: var(--c); font-weight: 700; }
+.mrow { padding: .45rem .6rem; border-left: 3px solid var(--c); background: var(--panel2); border-radius: 0 4px 4px 0; margin-bottom: .45rem; }
+.mrow.closed { border-left-style: dashed; }
+.mhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; }
+.mhead b { font-size: .9rem; } .mhead small { color: var(--muted); font-size: .75rem; }
+.bdg { font-size: .68rem; line-height: 1.5; border: 1px solid var(--rule); border-radius: 3px; padding: 0 .35rem; color: var(--muted); white-space: nowrap; }
+.bdg.closed { color: var(--closed); border-color: color-mix(in srgb, var(--closed) 50%, var(--rule)); }
+.bdg.turbo { color: var(--gold); border-color: color-mix(in srgb, var(--gold) 50%, var(--rule)); }
+.bdg.new { color: var(--good); border-color: color-mix(in srgb, var(--good) 50%, var(--rule)); }
+.stat { display: grid; grid-template-columns: minmax(0, 1fr); gap: .25rem; margin: .3rem 0 .2rem; }
+.qbar { height: .45rem; background: var(--off); border-radius: 2px; overflow: hidden; }
+.qbar i { display: block; height: 100%; width: 0; background: var(--c); }
+.nums { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: .76rem; color: var(--muted); }
+.nums b { color: var(--fg); }
+.ctl { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr) 3rem; gap: .2rem .6rem; align-items: center; margin-bottom: .3rem; }
+.ctl.wide { grid-template-columns: minmax(0, 1fr) 3.4rem; } .ctl.wide label { grid-column: 1 / -1; }
+.ctl label { font-size: .8rem; line-height: 1.35; }
+.ctl output { font-family: var(--num); font-variant-numeric: tabular-nums; text-align: right; font-size: .85rem; }
+input[type=range] { width: 100%; accent-color: var(--gold); }
+.hint { color: var(--muted); font-size: .78rem; margin: .3rem 0 0; }
+.row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.owned { display: flex; flex-wrap: wrap; gap: .35rem; }
+.owned span { font-size: .75rem; border: 1px solid var(--rule); border-radius: 3px; padding: .1rem .45rem; color: var(--muted); }
+.ctab { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.ctab th { text-align: left; color: var(--muted); font-weight: 500; padding: .2rem .4rem .3rem 0; white-space: nowrap; }
+.ctab td { padding: .3rem .4rem .3rem 0; border-top: 1px solid var(--rule); vertical-align: top; }
+.ctab td.n { font-family: var(--num); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.veil { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 82%, transparent); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; z-index: 20;
+  padding: calc(3.6rem + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) calc(1.5rem + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.veil[hidden] { display: none; }
+.card { background: var(--panel); border: 1px solid var(--rule); border-top: 4px solid var(--gold); border-radius: 4px; padding: 1.25rem 1.4rem; max-width: 46rem; width: 100%; display: flex; flex-direction: column; gap: .8rem; }
+.card .eyebrow { font-family: var(--num); color: var(--gold); letter-spacing: .08em; font-size: .78rem; }
+.card h2 { font-size: 1.35rem; margin: 0; line-height: 1.3; text-wrap: balance; }
+.card p { margin: 0; }
+.card .src { color: var(--muted); font-size: .8rem; border-left: 2px solid var(--rule); padding-left: .7rem; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .5rem; }
+.opt { text-align: left; padding: .6rem .75rem; display: flex; flex-direction: column; gap: .15rem; }
+.opt b { font-size: .9rem; } .opt small { color: var(--muted); font-size: .76rem; line-height: 1.45; }
+.opt .cost { font-family: var(--num); color: var(--gold); font-size: .85rem; }
+.opt.picked { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--panel2)); }
+.card h3 { font-size: .8rem; letter-spacing: .06em; color: var(--muted); font-weight: 500; margin: .3rem 0 0; }
+.shelf { display: flex; flex-direction: column; gap: .35rem; }
+.srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .3rem .8rem; align-items: center; padding: .45rem .6rem; background: var(--panel2); border-left: 3px solid var(--c); border-radius: 0 4px 4px 0; }
+.srow.closed { border-left-style: dashed; }
+.srow .meta { font-size: .76rem; color: var(--muted); }
+.srow .note { font-size: .76rem; grid-column: 1 / -1; }
+.srow button { white-space: nowrap; }
+.srow button.on { border-color: var(--good); color: var(--good); }
+table.rep { border-collapse: collapse; width: 100%; font-size: .88rem; }
+.rep td { padding: .3rem 0; border-top: 1px solid var(--rule); }
+.rep td:last-child { text-align: right; font-family: var(--num); font-variant-numeric: tabular-nums; padding-left: 1rem; }
+.basis { min-width: 38rem; font-size: .8rem !important; }
+.basis td { padding: .35rem .7rem .35rem 0 !important; text-align: left !important; font-family: var(--body) !important; vertical-align: top; }
+.basis thead td { color: var(--muted); border-top: 0; }
+.basis td:nth-child(2) { font-family: var(--num) !important; min-width: 9rem; }
+.big { font-family: var(--num); font-size: 2.2rem; color: var(--gold); line-height: 1.1; }
+</style>
+<style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="lang">
+      <button id="langBtn" aria-haspopup="true" aria-expanded="false" aria-controls="langMenu"><span class="code" id="langCode">EN</span><span data-i18n="lang">Language</span><span class="caret" aria-hidden="true">▾</span></button>
+      <div class="menu" id="langMenu" role="menu" hidden></div>
+    </div>
+  </div>
+  <header>
+    <div>
+      <h1>GPU HOTEL<span data-i18n="sub"></span></h1>
+      <p class="sub" data-i18n="intro"></p>
+    </div>
+    <div class="bar">
+      <button id="pause" aria-pressed="false"></button>
+      <button class="spd" data-s="1" aria-pressed="true">1×</button>
+      <button class="spd" data-s="2" aria-pressed="false">2×</button>
+      <button class="spd" data-s="4" aria-pressed="false">4×</button>
+    </div>
+  </header>
+
+  <section class="kpis" data-i18n-aria="a_kpis">
+    <div class="kpi"><b id="k-day"></b><span id="k-clock"></span></div>
+    <div class="kpi"><b id="k-cash">$0</b><span data-i18n="k_cash"></span></div>
+    <div class="kpi"><b id="k-today">$0</b><span data-i18n="k_today"></span></div>
+    <div class="kpi"><b id="k-rep">60</b><span data-i18n="k_rep"></span></div>
+    <div class="kpi"><b id="k-cov">0%</b><span data-i18n="k_cov"></span></div>
+    <div class="kpi"><b id="k-lost">0%</b><span data-i18n="k_lost"></span></div>
+  </section>
+  <div class="dayline" aria-hidden="true"><i id="dayline"></i></div>
+
+  <div class="main">
+    <div class="col">
+      <div>
+        <div class="facade"><div class="grid" id="grid" data-i18n-aria="a_grid"></div></div>
+        <div class="panel" style="border-top:0;border-radius:0 0 4px 4px">
+          <div class="legend">
+            <span><i style="background:var(--img)"></i><span data-i18n="c_img"></span></span>
+            <span><i style="background:var(--vid)"></i><span data-i18n="c_vid"></span></span>
+            <span><i style="background:var(--aud)"></i><span data-i18n="c_aud"></span></span>
+            <span><i style="background:var(--off)"></i><span data-i18n="lg_vac"></span></span>
+            <span><i style="background:repeating-linear-gradient(135deg,var(--muted) 0 3px,var(--off) 3px 6px)"></i><span data-i18n="lg_prep"></span></span>
+            <span><i style="background:color-mix(in srgb,var(--muted) 30%,var(--off))"></i><span data-i18n="lg_warm"></span></span>
+            <span><i style="background:repeating-linear-gradient(45deg,var(--bad) 0 3px,#120a10 3px 6px)"></i><span data-i18n="lg_down"></span></span>
+            <span><i style="background:var(--off);outline:1px solid var(--gold)"></i><span data-i18n="lg_tb"></span></span>
+          </div>
+          <div class="ticker" id="ticker" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="chart"></h2>
+        <canvas id="chart" width="900" height="240"></canvas>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="cust"></h2>
+        <div style="overflow-x:auto"><table class="ctab" id="ctab"></table></div>
+        <p class="hint" data-i18n="cust_hint"></p>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="owned"></h2>
+        <div class="owned" id="owned"></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel" id="shelf"></div>
+      <div class="panel">
+        <h2 data-i18n="policy"></h2>
+        <div class="ctl"><label for="keep" data-i18n="keep"></label><input type="range" id="keep" min="0" max="300" step="5" value="60"><output id="o-keep"></output></div>
+        <div class="ctl wide"><label for="win" data-i18n="win"></label><input type="range" id="win" min="0" max="100" value="20"><output id="o-win"></output></div>
+        <div class="ctl wide"><label for="surge" data-i18n="surge"></label><input type="range" id="surge" min="100" max="250" step="10" value="100"><output id="o-surge"></output></div>
+        <div class="row" style="margin-top:.4rem"><label for="policy" data-i18n="order"></label>
+          <select id="policy"><option value="fifo" data-i18n="o_fifo"></option><option value="rich" data-i18n="o_rich"></option><option value="short" data-i18n="o_short"></option></select>
+        </div>
+        <div class="row" style="margin-top:.8rem">
+          <button id="burst" data-i18n="burst"></button>
+          <button id="limit" aria-pressed="false" data-i18n="limit"></button>
+        </div>
+        <p class="hint" id="burst-hint"></p>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h2 data-i18n="basis"></h2>
+    <div style="overflow-x:auto"><table class="rep basis" id="basis"></table></div>
+    <p class="hint" data-i18n="bnote"></p>
+  </div>
+</div>
+<div class="veil" id="veil" hidden><div class="card" id="card" role="dialog" aria-modal="true"></div></div>
+
+<script>
+// ================= translations =================
+const L = {
+en: {
+  lang: 'Language', sub: 'Inference Hotel · Model Marketplace',
+  intro: 'One API key, every model. Your 100-GPU hotel also resells other labs’ models. Open models run in your rooms and you keep the whole price; closed models run in the lab’s rooms and you keep only the lab’s cut. Choose the shelf, keep the right rooms warm, and grow your valuation over seven days.',
+  pause: 'Pause', resume: 'Resume', a_kpis: 'Hotel metrics', a_grid: 'Room status',
+  k_cash: 'Cash', k_today: 'Today’s profit', k_rep: 'Developer community (traffic and lab access)', k_cov: 'Coverage (demand you could serve)', k_lost: 'Walkout loss today',
+  day: 'Day {n}', clock: '{time} · {n}-day run',
+  c_img: 'Image', c_vid: 'Video', c_aud: 'Audio',
+  lg_vac: 'Vacant (sublet on spot)', lg_prep: 'Prepping (cold start)', lg_warm: 'Warm, no guest', lg_down: 'Out of order', lg_tb: 'Exclusive turbo model',
+  k_open: 'Open · your GPUs', k_closed: 'Closed · resold', k_turbo: 'Exclusive turbo', k_new: 'New today',
+  chart: 'Today’s occupancy (rooms in use by category; dashed line = rooms open). Closed models use no rooms.',
+  cust: 'Customers', ccols: ['Customer', 'Uses', 'Paid today', 'Your revenue', 'Status'], cust_hint: 'Customers pick a model, not a hotel. If the model they want isn’t on your shelf, most take that request elsewhere.',
+  st_active: 'Active', st_strike: 'Unhappy', st_churn: 'Left', st_deal: 'On discount', st_gone: 'Graduated',
+  cn: { self: 'Self-serve developers', lumen: 'Lumenfield · viral video app', canvas: 'Canvasly · design platform', shop: 'Shopwave · e-commerce', parrot: 'Parrot Learn · language app' },
+  owned: 'Upgrades owned', none: 'None yet',
+  shelf: 'Model shelf · one API key', shelf_none: 'Nothing listed',
+  row_open: '<b>{share}</b> of {cat} demand · queue <b>{q}</b> · P95 <b>{p}s</b> · rooms <b>{r}</b> · revenue <b>{rev}</b>',
+  row_closed: '<b>{share}</b> of {cat} demand · lab quota used <b>{u}</b> · P95 <b>{p}s</b> · your cut <b>{rev}</b>',
+  mw: 'Min warm rooms',
+  policy: 'House policy', keep: 'Keep warm after empty',
+  win: 'Batch wait: hold for a fuller batch before starting. Fuller batches use fewer rooms, but guests wait a little longer',
+  surge: 'Peak surcharge cap on open models: above 80% occupancy prices climb, and fewer guests book',
+  order: 'Who gets a room first', o_fifo: 'Closest to walking out', o_rich: 'Highest paying', o_short: 'Shortest job',
+  burst: 'Rent 10 rooms now', limit: 'Rate-limit self-serve developers',
+  bhint: 'Rented rooms cost ${b}/h each (your own ${o}, a vacant room sublets for ${s}). {n} rentals left today.',
+  basis: 'Where the numbers come from', bcols: ['Mechanic', 'In game', 'Basis'],
+  brows: [
+    ['Open models: serve / prep', 'image 3–4 s / 20–25 s · video 60–75 s / 90–100 s · audio 1.5 s / 15 s', 'Flux schnell 0.7 s, SDXL TensorRT 1.5 s, Flux dev 3–5 s (estimate); hosted 5-second clip median about 60 s (Kling); Modal measured cold starts of 11–120 s'],
+    ['Closed models', 'resold at list price · your cut 10–25%', 'Veo 3.1 Standard costs $0.40 per second on Google, fal, Replicate and Vercel alike. Wholesale cuts are not public; 10–25% is an estimate'],
+    ['Resale vs. own models', 'thin cut vs. full price', 'Higgsfield says it makes 20–30% gross margin on third-party closed models and 80%+ on its own post-trained models (company claim via Sacra)'],
+    ['Exclusive turbo', '2.9× faster · +15% price', 'fal says H3 Max runs about 35× faster than MiniMax’s own endpoint (vendor claim); the game uses a smaller boost'],
+    ['Breadth', '3–5 models per category', 'A fal report cited by a16z puts the median at 14 models per enterprise deployment; top video models stay hot for about 30 days (compressed to days here)'],
+    ['Delisting', 'day 5', 'fal’s Veo 3.1 endpoints were deprecated in November 2026; OpenAI shut down the Sora API in September 2026'],
+    ['Graduation', 'day 6', 'OpenRouter customers tend to go direct around $1M of spend; Higgsfield moved compute to GMI Cloud and launched its own API'],
+    ['GPU rent / emergency / sublet', '$2.6 / $4.5 / $1.5 per GPU-hour', 'H100 contract $2.35–2.90, neocloud on-demand $2.89–4.39; memory snapshots cut prep from 45 s to 5 s (Modal)'],
+    ['Who’s who', 'fictional names', 'Prism ≈ FLUX, Horizon ≈ Veo, Koi ≈ Kling, Monsoon H3 ≈ MiniMax H3, Seedling ≈ Seedance, Orbital ≈ Google, Lumenfield ≈ Higgsfield, Canvasly ≈ Canva. Loose parallels, not portraits'],
+  ],
+  bnote: 'Mechanics and orders of magnitude come from public sources. Prices, traffic, cuts and event strength are tuned for play and are not real quotes.',
+  f_hard: 'A room’s hardware failed. It is out of order and its guests are back in the queue',
+  f_slow: 'A room is overheating and runs at half speed until tonight’s maintenance',
+  b_msg: '10 rented rooms arrive in about 45 s at ${p}/h each, returned tonight',
+  l_on: 'Rate limiting self-serve developers: their demand −25%. The longer it runs, the more community you lose', l_off: 'Rate limiting off',
+  quota: '{m} hit the lab’s rate limit; extra requests are waiting on the lab',
+  u: {
+    snap: ['Memory snapshots', 'Room prep −75%. Hosting many open models gets cheaper because cold starts hurt less.'],
+    fast: ['Compiler team', 'Open models serve 25% faster, so the same rooms take more bookings.'],
+    deal: ['Three-year prepaid contract', '30 more rooms for good at $2.35/h each. Cheaper than renting, but you pay even when they sit empty.'],
+    lane: ['Overnight batch lane', 'Extra half-price, no-rush image and video jobs that fill idle warm rooms of open models.'],
+    spot: ['Spot sublet deal', 'Vacant rooms earn double sublet income.'],
+    devprog: ['Developer program', 'Docs, credits and hackathons: community +8 now and self-serve traffic +10%.'],
+  },
+  ev: [
+    { t: 'Opening day', x: 'You open with one API key in front of a small shelf: three open models in your own rooms and Horizon 3, a closed video model you resell. Koi 4 is on the market but not on your shelf; customers who want it go elsewhere unless you list it.',
+      s: 'Real-world parallel: fal sells 1,000+ models behind one key. Closed models like Veo are resold at the lab’s list price, so the aggregator’s margin is whatever cut the lab gives.' },
+    { t: 'Double launch day', x: 'Monsoon releases H3, an open video model, and Northlight launches Prism 3 Pro, a closed image model. Day-zero access to Prism 3 Pro needs a developer community of 55. Monsoon offers to build an exclusive turbo version of H3 with you.',
+      s: 'Real-world parallel: fal post-trained H3 Max with MiniMax and FLUX 3 Max with Black Forest Labs. Labs launch day-zero with the aggregators that bring them developers.' },
+    { t: 'Summer GPU crunch', x: 'A supplier’s data center is late. 25 rooms are offline today and emergency rentals cost three times as much. Choir Voice, a closed audio model, launches today (needs community 50).',
+      s: 'Real-world parallel: fal rate-limited customers in summer 2026 because it ran out of compute. SemiAnalysis recorded H100 one-year contract prices up almost 40% in five months.',
+      c: [['Rate-limit self-serve developers all day', 'Their demand −25%, community −3'], ['Tough it out', 'No limits; guests who can’t get a room walk out']] },
+    { t: 'The hottest launch of the season', x: 'Bytewave launches Seedling 2.5, the best video model on the market. It only goes day-zero with platforms whose developer community is at least 65. Kiln Image, a strong open image model, drops the same day.',
+      s: 'Real-world parallel: Seedance and Kling are among the most requested models in the West; Sacra estimates fal and Higgsfield together carry about half of Western inference to them.' },
+    { t: 'Orbital pulls Horizon 3', x: 'Orbital withdraws Horizon 3 from every aggregator to push its own platform, and launches Sparrow Image with a community bar of 72. Horizon 3’s customers now pick from whatever other video models you carry.',
+      s: 'Real-world parallel: fal’s Veo 3.1 endpoints were deprecated in November 2026 while Veo stayed on Google’s own Vertex; OpenAI shut down the Sora API in September 2026.' },
+    { t: 'Lumenfield wants to graduate', x: 'Lumenfield, the viral video app, has grown into one of your biggest customers. It plans to sign its own GPU contracts and launch a competing API.',
+      s: 'Real-world parallel: Higgsfield moved compute to GMI Cloud (reportedly 45% cheaper) and launched its own 50+ model API; OpenRouter customers tend to go direct around $1M of spend.',
+      c: [['Give them 20% off to stay', 'Lumenfield stays and won’t compete, but you eat the discount, even on closed models where your cut is smaller than 20%'], ['Let them go', 'You lose Lumenfield, and its new API takes 10% of your self-serve developers']] },
+    { t: 'Investor demo day', x: 'Traffic is up 25%. At close, investors value you on annualized revenue, with a multiple that rewards community and exclusive models and punishes dependence on one customer.' },
+  ],
+  m_eyebrow: 'Day {d} of {n} · Morning briefing', decide: 'One decision before you open',
+  sh_title: 'Your shelf', sh_hint: 'Listing is free. Open models need warm rooms in your hotel; closed models need none, but you keep only the lab’s cut and the lab caps how many requests you can send.',
+  list: 'List', listed: 'Listed', unlist: 'Unlist', from_day: 'From day {d}', q: 'quality {q}', cut: 'your cut {x}%', price_x: 'price ×{x}',
+  dz_ok: 'Day-zero access granted', dz_no: 'The lab picked partners with a bigger developer community (needs {g}). You can list it tomorrow.', needs: 'needs community {g}',
+  proj: 'Lab partnership', turbo: 'Build an exclusive turbo {m} with {lab}', turbo_d: '2.9× faster, 15% higher price, more customers pick it, and no lab can pull it. Ready tomorrow.', turbo_wip: 'In progress · ready on day {d}',
+  shop: 'Upgrades for sale (cash {c})', owned_tag: 'Owned', allbought: 'You own every upgrade.', open: 'Open for business', decidefirst: 'Make the decision above first',
+  e_eyebrow: 'Day {d} · Closing time', made: 'You made {x} today', lost: 'You lost {x} today',
+  r_open: 'Open models on your GPUs', r_take: 'Your cut of closed-model resale', r_sub: 'Sublets', r_rent: 'Room rent', r_profit: 'Today’s profit', r_gmv: 'What customers paid you', r_cov: 'Coverage', r_loss: 'Walkout loss', r_cold: 'Cold starts', r_rep: 'Community change', r_cash: 'Cash',
+  ev_strike: '{c} is unhappy with {cat} reliability (warning {n} of 2)', ev_churn: '{c} left for another provider',
+  go_broke: 'Out of money', go_last: 'See your valuation', go_next: 'Next day',
+  t_loss: 'Too many walkouts. Keep more warm rooms for the models customers are waiting on, or prep rooms before the peak. If a closed model keeps hitting its lab quota, carry an alternative.',
+  t_cov: 'Coverage is low: customers asked for models you don’t carry. One API key only works if your shelf has what they want.',
+  t_util: 'Occupancy is low. You are keeping too many rooms warm; empty warm rooms earn nothing, and closed ones can be sublet.',
+  t_cold: 'Too many cold starts. Hosting many open models spreads your rooms thin; keep rooms warm longer or buy memory snapshots.',
+  t_ok: 'Well run today. Traffic grows every day, so think about new models, exclusive versions and more rooms.',
+  f_eyebrow: 'Seven-day verdict', rank_broke: 'Liquidated', rank1: 'Generative media platform of the decade', rank2: 'Breakout model marketplace', rank3: 'Solid API reseller', rank4: 'Thin wrapper',
+  f_arr: 'Annualized revenue (last three days)', f_base: 'Base multiple', f_rep: 'Developer community {r}', f_excl: 'Exclusive models ×{n}', f_margin: 'Gross margin {p}', f_conc: 'Largest customer is {p} of revenue', f_mult: 'Valuation multiple',
+  f_profit: 'Seven-day profit', f_cash: 'Closing cash', f_best: 'Best valuation so far',
+  f_note: 'Investors pay for what can’t be copied: a developer community labs want to launch with, models only you have, and revenue that doesn’t hang on one customer.',
+  again: 'Open another hotel',
+},
+es: {
+  lang: 'Idioma', sub: 'Hotel de inferencia · Mercado de modelos',
+  intro: 'Una API key, todos los modelos. Tu hotel de 100 GPU también revende modelos de otros laboratorios. Los modelos abiertos corren en tus habitaciones y te quedas el precio entero; los cerrados corren en las del laboratorio y solo te quedas su comisión. Elige el catálogo, mantén calientes las habitaciones justas y haz crecer tu valoración en siete días.',
+  pause: 'Pausa', resume: 'Seguir', a_kpis: 'Indicadores del hotel', a_grid: 'Estado de las habitaciones',
+  k_cash: 'Caja', k_today: 'Beneficio de hoy', k_rep: 'Comunidad de desarrolladores (tráfico y acceso a laboratorios)', k_cov: 'Cobertura (demanda que podías atender)', k_lost: 'Pérdida por abandonos hoy',
+  day: 'Día {n}', clock: '{time} · partida de {n} días',
+  c_img: 'Imagen', c_vid: 'Vídeo', c_aud: 'Audio',
+  lg_vac: 'Vacía (realquilada en spot)', lg_prep: 'Preparando (arranque en frío)', lg_warm: 'Caliente, sin huésped', lg_down: 'Fuera de servicio', lg_tb: 'Modelo turbo exclusivo',
+  k_open: 'Abierto · tus GPU', k_closed: 'Cerrado · reventa', k_turbo: 'Turbo exclusivo', k_new: 'Nuevo hoy',
+  chart: 'Ocupación de hoy (habitaciones en uso por categoría; línea discontinua = habitaciones abiertas). Los modelos cerrados no usan habitaciones.',
+  cust: 'Clientes', ccols: ['Cliente', 'Usa', 'Pagó hoy', 'Tus ingresos', 'Estado'], cust_hint: 'Los clientes eligen un modelo, no un hotel. Si el modelo que quieren no está en tu catálogo, la mayoría se lleva esa petición a otra parte.',
+  st_active: 'Activo', st_strike: 'Descontento', st_churn: 'Se fue', st_deal: 'Con descuento', st_gone: 'Independizado',
+  cn: { self: 'Desarrolladores autoservicio', lumen: 'Lumenfield · app de vídeo viral', canvas: 'Canvasly · plataforma de diseño', shop: 'Shopwave · comercio electrónico', parrot: 'Parrot Learn · app de idiomas' },
+  owned: 'Mejoras compradas', none: 'Ninguna todavía',
+  shelf: 'Catálogo de modelos · una API key', shelf_none: 'Nada en catálogo',
+  row_open: '<b>{share}</b> de la demanda de {cat} · cola <b>{q}</b> · P95 <b>{p}s</b> · hab. <b>{r}</b> · ingresos <b>{rev}</b>',
+  row_closed: '<b>{share}</b> de la demanda de {cat} · cuota del laboratorio <b>{u}</b> · P95 <b>{p}s</b> · tu comisión <b>{rev}</b>',
+  mw: 'Mín. habitaciones calientes',
+  policy: 'Política de la casa', keep: 'Mantener caliente al vaciarse',
+  win: 'Espera de lote: junta un lote más lleno antes de empezar. Los lotes llenos usan menos habitaciones, pero los huéspedes esperan un poco más',
+  surge: 'Tope de recargo en hora punta para modelos abiertos: por encima del 80% de ocupación el precio sube y reservan menos huéspedes',
+  order: 'Quién entra primero', o_fifo: 'El que está a punto de irse', o_rich: 'El que más paga', o_short: 'El trabajo más corto',
+  burst: 'Alquilar 10 habitaciones ya', limit: 'Limitar a los desarrolladores autoservicio',
+  bhint: 'Cada habitación alquilada cuesta ${b}/h (las tuyas ${o}; una vacía se realquila a ${s}). Te quedan {n} alquileres hoy.',
+  basis: 'De dónde salen los números', bcols: ['Mecánica', 'En el juego', 'Fuente'],
+  brows: [
+    ['Modelos abiertos: servicio / preparación', 'imagen 3–4 s / 20–25 s · vídeo 60–75 s / 90–100 s · audio 1,5 s / 15 s', 'Flux schnell 0,7 s, SDXL TensorRT 1,5 s, Flux dev 3–5 s (estimado); un clip alojado de 5 segundos tarda unos 60 s de mediana (Kling); Modal midió arranques en frío de 11–120 s'],
+    ['Modelos cerrados', 'reventa a precio de lista · tu comisión 10–25%', 'Veo 3.1 Standard cuesta $0,40 por segundo igual en Google, fal, Replicate y Vercel. Las comisiones mayoristas no son públicas; el 10–25% es una estimación'],
+    ['Reventa frente a modelos propios', 'comisión fina frente a precio entero', 'Higgsfield dice tener un 20–30% de margen bruto en modelos cerrados de terceros y más del 80% en sus modelos post-entrenados (dato de la empresa vía Sacra)'],
+    ['Turbo exclusivo', '2,9× más rápido · precio +15%', 'fal afirma que H3 Max va unas 35× más rápido que el endpoint de MiniMax (dato del proveedor); el juego usa una mejora menor'],
+    ['Amplitud', '3–5 modelos por categoría', 'Un informe de fal citado por a16z da una mediana de 14 modelos por despliegue empresarial; los mejores modelos de vídeo se mantienen de moda unos 30 días (aquí comprimidos a días)'],
+    ['Retirada', 'día 5', 'Los endpoints de Veo 3.1 de fal se retiraron en noviembre de 2026; OpenAI cerró la API de Sora en septiembre de 2026'],
+    ['Independización', 'día 6', 'Los clientes de OpenRouter tienden a ir directos al rondar el millón de dólares de gasto; Higgsfield trasladó su cómputo a GMI Cloud y lanzó su propia API'],
+    ['Alquiler / urgente / realquiler', '$2.6 / $4.5 / $1.5 por GPU-hora', 'Contrato H100 $2,35–2,90, neocloud bajo demanda $2,89–4,39; los snapshots de memoria bajan la preparación de 45 s a 5 s (Modal)'],
+    ['Quién es quién', 'nombres ficticios', 'Prism ≈ FLUX, Horizon ≈ Veo, Koi ≈ Kling, Monsoon H3 ≈ MiniMax H3, Seedling ≈ Seedance, Orbital ≈ Google, Lumenfield ≈ Higgsfield, Canvasly ≈ Canva. Paralelos aproximados, no retratos'],
+  ],
+  bnote: 'Las mecánicas y los órdenes de magnitud vienen de fuentes públicas. Precios, tráfico, comisiones e intensidad de los eventos están ajustados para jugar y no son tarifas reales.',
+  f_hard: 'Una habitación ha sufrido una avería de hardware. Queda fuera de servicio y sus huéspedes vuelven a la cola',
+  f_slow: 'Una habitación se sobrecalienta y va a media velocidad hasta el mantenimiento de esta noche',
+  b_msg: '10 habitaciones alquiladas llegan en unos 45 s a ${p}/h cada una; se devuelven esta noche',
+  l_on: 'Limitando a los desarrolladores autoservicio: su demanda −25%. Cuanto más dure, más comunidad pierdes', l_off: 'Limitación desactivada',
+  quota: '{m} alcanzó el límite del laboratorio; las peticiones extra esperan al laboratorio',
+  u: {
+    snap: ['Snapshots de memoria', 'Preparación −75%. Alojar muchos modelos abiertos sale más barato porque los arranques en frío duelen menos.'],
+    fast: ['Equipo de compiladores', 'Los modelos abiertos sirven un 25% más rápido: las mismas habitaciones aceptan más reservas.'],
+    deal: ['Contrato prepagado a tres años', '30 habitaciones más para siempre a $2.35/h. Más barato que alquilar, pero pagas aunque estén vacías.'],
+    lane: ['Carril nocturno por lotes', 'Trabajos extra de imagen y vídeo a mitad de precio y sin prisa, que llenan habitaciones calientes desocupadas de modelos abiertos.'],
+    spot: ['Acuerdo de realquiler spot', 'Las habitaciones vacías ganan el doble al realquilarse.'],
+    devprog: ['Programa para desarrolladores', 'Documentación, créditos y hackatones: comunidad +8 ya y tráfico autoservicio +10%.'],
+  },
+  ev: [
+    { t: 'Día de apertura', x: 'Abres con una API key delante de un catálogo pequeño: tres modelos abiertos en tus habitaciones y Horizon 3, un modelo de vídeo cerrado que revendes. Koi 4 está en el mercado pero no en tu catálogo; quien lo quiera se irá a otra parte salvo que lo añadas.',
+      s: 'Paralelo real: fal vende más de 1.000 modelos con una sola key. Los modelos cerrados como Veo se revenden al precio de lista del laboratorio, así que el margen del agregador es la comisión que este le dé.' },
+    { t: 'Doble lanzamiento', x: 'Monsoon publica H3, un modelo de vídeo abierto, y Northlight lanza Prism 3 Pro, un modelo de imagen cerrado. El acceso desde el día cero a Prism 3 Pro exige una comunidad de 55. Monsoon te propone crear juntos una versión turbo exclusiva de H3.',
+      s: 'Paralelo real: fal post-entrenó H3 Max con MiniMax y FLUX 3 Max con Black Forest Labs. Los laboratorios lanzan el día cero con los agregadores que les traen desarrolladores.' },
+    { t: 'Escasez de GPU en verano', x: 'El centro de datos de un proveedor se retrasa. Hoy faltan 25 habitaciones y el alquiler urgente cuesta el triple. Hoy sale Choir Voice, un modelo de audio cerrado (exige comunidad 50).',
+      s: 'Paralelo real: fal limitó a sus clientes en el verano de 2026 por falta de cómputo. SemiAnalysis registró subidas de casi un 40% en cinco meses en los contratos H100 a un año.',
+      c: [['Limitar a los autoservicio todo el día', 'Su demanda −25%, comunidad −3'], ['Aguantar sin limitar', 'Sin límites; quien no consigue habitación se va']] },
+    { t: 'El lanzamiento más esperado', x: 'Bytewave lanza Seedling 2.5, el mejor modelo de vídeo del mercado. Solo sale el día cero con plataformas cuya comunidad llegue a 65. El mismo día aparece Kiln Image, un buen modelo de imagen abierto.',
+      s: 'Paralelo real: Seedance y Kling están entre los modelos más pedidos en Occidente; Sacra estima que fal y Higgsfield llevan juntos cerca de la mitad de la inferencia occidental hacia ellos.' },
+    { t: 'Orbital retira Horizon 3', x: 'Orbital retira Horizon 3 de todos los agregadores para impulsar su propia plataforma y lanza Sparrow Image con un listón de comunidad de 72. Los clientes de Horizon 3 eligen ahora entre los demás modelos de vídeo que tengas.',
+      s: 'Paralelo real: los endpoints de Veo 3.1 de fal se retiraron en noviembre de 2026 mientras Veo seguía en Vertex, de Google; OpenAI cerró la API de Sora en septiembre de 2026.' },
+    { t: 'Lumenfield quiere independizarse', x: 'Lumenfield, la app de vídeo viral, se ha convertido en uno de tus mayores clientes. Planea firmar sus propios contratos de GPU y lanzar una API competidora.',
+      s: 'Paralelo real: Higgsfield trasladó su cómputo a GMI Cloud (un 45% más barato, según se informa) y lanzó su propia API de más de 50 modelos; los clientes de OpenRouter tienden a ir directos al rondar el millón de dólares.',
+      c: [['Darle un 20% de descuento', 'Lumenfield se queda y no compite, pero tú asumes el descuento, incluso en modelos cerrados donde tu comisión es menor del 20%'], ['Dejarlo ir', 'Pierdes a Lumenfield y su nueva API se lleva el 10% de tus desarrolladores autoservicio']] },
+    { t: 'Día de demo para inversores', x: 'El tráfico sube un 25%. Al cierre, los inversores te valoran por ingresos anualizados, con un múltiplo que premia la comunidad y los modelos exclusivos y castiga depender de un solo cliente.' },
+  ],
+  m_eyebrow: 'Día {d} de {n} · Reunión de la mañana', decide: 'Una decisión antes de abrir',
+  sh_title: 'Tu catálogo', sh_hint: 'Añadir modelos es gratis. Los abiertos necesitan habitaciones calientes en tu hotel; los cerrados no, pero solo te quedas la comisión del laboratorio y este limita cuántas peticiones le puedes enviar.',
+  list: 'Añadir', listed: 'En catálogo', unlist: 'Quitar', from_day: 'Desde el día {d}', q: 'calidad {q}', cut: 'tu comisión {x}%', price_x: 'precio ×{x}',
+  dz_ok: 'Acceso desde el día cero concedido', dz_no: 'El laboratorio eligió socios con una comunidad mayor (exige {g}). Podrás añadirlo mañana.', needs: 'exige comunidad {g}',
+  proj: 'Alianza con laboratorio', turbo: 'Crear un {m} turbo exclusivo con {lab}', turbo_d: '2,9× más rápido, precio un 15% más alto, más clientes lo eligen y ningún laboratorio te lo puede retirar. Listo mañana.', turbo_wip: 'En curso · listo el día {d}',
+  shop: 'Mejoras a la venta (caja {c})', owned_tag: 'Comprada', allbought: 'Ya tienes todas las mejoras.', open: 'Abrir el hotel', decidefirst: 'Primero toma la decisión de arriba',
+  e_eyebrow: 'Día {d} · Cierre', made: 'Hoy ganaste {x}', lost: 'Hoy perdiste {x}',
+  r_open: 'Modelos abiertos en tus GPU', r_take: 'Tu comisión por reventa de cerrados', r_sub: 'Realquileres', r_rent: 'Alquiler de habitaciones', r_profit: 'Beneficio de hoy', r_gmv: 'Lo que te pagaron los clientes', r_cov: 'Cobertura', r_loss: 'Pérdida por abandonos', r_cold: 'Arranques en frío', r_rep: 'Cambio de comunidad', r_cash: 'Caja',
+  ev_strike: '{c} está descontento con la fiabilidad de {cat} (aviso {n} de 2)', ev_churn: '{c} se fue a otro proveedor',
+  go_broke: 'Sin dinero', go_last: 'Ver la valoración', go_next: 'Día siguiente',
+  t_loss: 'Demasiados abandonos. Deja más habitaciones calientes para los modelos que los clientes esperan, o prepáralas antes del pico. Si un modelo cerrado choca a menudo con la cuota del laboratorio, ofrece una alternativa.',
+  t_cov: 'Cobertura baja: los clientes pidieron modelos que no tienes. Una API key solo funciona si tu catálogo tiene lo que quieren.',
+  t_util: 'Ocupación baja. Mantienes demasiadas habitaciones calientes: vacías no ganan nada y cerradas se pueden realquilar.',
+  t_cold: 'Demasiados arranques en frío. Alojar muchos modelos abiertos reparte demasiado tus habitaciones; mantenlas calientes más tiempo o compra snapshots de memoria.',
+  t_ok: 'Buen trabajo hoy. El tráfico crece cada día: piensa en nuevos modelos, versiones exclusivas y más habitaciones.',
+  f_eyebrow: 'Veredicto de siete días', rank_broke: 'Liquidado', rank1: 'La plataforma de medios generativos de la década', rank2: 'Mercado de modelos revelación', rank3: 'Revendedor de API sólido', rank4: 'Envoltorio fino',
+  f_arr: 'Ingresos anualizados (últimos tres días)', f_base: 'Múltiplo base', f_rep: 'Comunidad de desarrolladores {r}', f_excl: 'Modelos exclusivos ×{n}', f_margin: 'Margen bruto {p}', f_conc: 'Tu mayor cliente es el {p} de los ingresos', f_mult: 'Múltiplo de valoración',
+  f_profit: 'Beneficio de siete días', f_cash: 'Caja final', f_best: 'Mejor valoración hasta ahora',
+  f_note: 'Los inversores pagan por lo que no se puede copiar: una comunidad con la que los laboratorios quieren lanzar, modelos que solo tienes tú e ingresos que no dependen de un único cliente.',
+  again: 'Abrir otro hotel',
+},
+fr: {
+  lang: 'Langue', sub: 'Hôtel d’inférence · Place de marché de modèles',
+  intro: 'Une clé d’API, tous les modèles. Votre hôtel de 100 GPU revend aussi les modèles d’autres labos. Les modèles ouverts tournent dans vos chambres et vous gardez tout le prix ; les modèles fermés tournent dans les chambres du labo et vous ne gardez que sa commission. Choisissez le catalogue, gardez au chaud les bonnes chambres et faites grimper votre valorisation en sept jours.',
+  pause: 'Pause', resume: 'Reprendre', a_kpis: 'Indicateurs de l’hôtel', a_grid: 'État des chambres',
+  k_cash: 'Trésorerie', k_today: 'Bénéfice du jour', k_rep: 'Communauté de développeurs (trafic et accès aux labos)', k_cov: 'Couverture (demande que vous pouviez servir)', k_lost: 'Perte due aux départs',
+  day: 'Jour {n}', clock: '{time} · partie de {n} jours',
+  c_img: 'Image', c_vid: 'Vidéo', c_aud: 'Audio',
+  lg_vac: 'Libre (sous-louée au spot)', lg_prep: 'En préparation (démarrage à froid)', lg_warm: 'Chaude, sans client', lg_down: 'Hors service', lg_tb: 'Modèle turbo exclusif',
+  k_open: 'Ouvert · vos GPU', k_closed: 'Fermé · revendu', k_turbo: 'Turbo exclusif', k_new: 'Nouveau',
+  chart: 'Occupation du jour (chambres utilisées par catégorie ; pointillés = chambres ouvertes). Les modèles fermés n’utilisent aucune chambre.',
+  cust: 'Clients', ccols: ['Client', 'Utilise', 'Payé aujourd’hui', 'Votre revenu', 'Statut'], cust_hint: 'Les clients choisissent un modèle, pas un hôtel. Si le modèle voulu n’est pas dans votre catalogue, la plupart envoient la requête ailleurs.',
+  st_active: 'Actif', st_strike: 'Mécontent', st_churn: 'Parti', st_deal: 'Remisé', st_gone: 'Émancipé',
+  cn: { self: 'Développeurs en libre-service', lumen: 'Lumenfield · app vidéo virale', canvas: 'Canvasly · plateforme de design', shop: 'Shopwave · e-commerce', parrot: 'Parrot Learn · app de langues' },
+  owned: 'Améliorations acquises', none: 'Aucune pour l’instant',
+  shelf: 'Catalogue de modèles · une clé d’API', shelf_none: 'Rien au catalogue',
+  row_open: '<b>{share}</b> de la demande {cat} · file <b>{q}</b> · P95 <b>{p}s</b> · ch. <b>{r}</b> · revenu <b>{rev}</b>',
+  row_closed: '<b>{share}</b> de la demande {cat} · quota du labo utilisé <b>{u}</b> · P95 <b>{p}s</b> · votre commission <b>{rev}</b>',
+  mw: 'Chambres chaudes min.',
+  policy: 'Politique de la maison', keep: 'Garder chaude une fois vide',
+  win: 'Attente de lot : attendre un lot plus plein avant de lancer. Les lots pleins utilisent moins de chambres, mais les clients attendent un peu plus',
+  surge: 'Plafond de majoration en pointe sur les modèles ouverts : au-delà de 80 % d’occupation les prix montent et moins de clients réservent',
+  order: 'Qui passe en premier', o_fifo: 'Le plus près de partir', o_rich: 'Celui qui paie le plus', o_short: 'La tâche la plus courte',
+  burst: 'Louer 10 chambres maintenant', limit: 'Limiter les développeurs en libre-service',
+  bhint: 'Chaque chambre louée coûte ${b}/h (les vôtres ${o} ; une chambre libre se sous-loue ${s}). Encore {n} locations possibles aujourd’hui.',
+  basis: 'D’où viennent les chiffres', bcols: ['Mécanisme', 'Dans le jeu', 'Source'],
+  brows: [
+    ['Modèles ouverts : service / préparation', 'image 3–4 s / 20–25 s · vidéo 60–75 s / 90–100 s · audio 1,5 s / 15 s', 'Flux schnell 0,7 s, SDXL TensorRT 1,5 s, Flux dev 3 à 5 s (estimé) ; un clip hébergé de 5 secondes prend environ 60 s en médiane (Kling) ; Modal a mesuré des démarrages à froid de 11 à 120 s'],
+    ['Modèles fermés', 'revendus au prix catalogue · commission 10–25 %', 'Veo 3.1 Standard coûte 0,40 $ la seconde chez Google, fal, Replicate et Vercel. Les commissions de gros ne sont pas publiques ; 10–25 % est une estimation'],
+    ['Revente contre modèles maison', 'commission fine contre prix plein', 'Higgsfield dit dégager 20–30 % de marge brute sur les modèles fermés de tiers et plus de 80 % sur ses propres modèles post-entraînés (déclaration de l’entreprise via Sacra)'],
+    ['Turbo exclusif', '2,9× plus rapide · prix +15 %', 'fal affirme que H3 Max tourne environ 35× plus vite que l’endpoint de MiniMax (déclaration du fournisseur) ; le jeu utilise un gain plus modeste'],
+    ['Étendue du catalogue', '3–5 modèles par catégorie', 'Un rapport de fal cité par a16z donne une médiane de 14 modèles par déploiement en entreprise ; les meilleurs modèles vidéo restent à la mode environ 30 jours (comprimés en jours ici)'],
+    ['Retrait', 'jour 5', 'Les endpoints Veo 3.1 de fal ont été retirés en novembre 2026 ; OpenAI a fermé l’API Sora en septembre 2026'],
+    ['Émancipation', 'jour 6', 'Les clients d’OpenRouter passent souvent en direct vers un million de dollars de dépenses ; Higgsfield a déplacé son calcul vers GMI Cloud et lancé sa propre API'],
+    ['Loyer / urgence / sous-location', '$2.6 / $4.5 / $1.5 par GPU-heure', 'Contrat H100 2,35–2,90 $, neocloud à la demande 2,89–4,39 $ ; les snapshots mémoire font passer la préparation de 45 s à 5 s (Modal)'],
+    ['Qui est qui', 'noms fictifs', 'Prism ≈ FLUX, Horizon ≈ Veo, Koi ≈ Kling, Monsoon H3 ≈ MiniMax H3, Seedling ≈ Seedance, Orbital ≈ Google, Lumenfield ≈ Higgsfield, Canvasly ≈ Canva. Parallèles approximatifs, pas des portraits'],
+  ],
+  bnote: 'Les mécanismes et les ordres de grandeur viennent de sources publiques. Prix, trafic, commissions et intensité des événements sont réglés pour le jeu et ne sont pas des tarifs réels.',
+  f_hard: 'Une chambre a une panne matérielle. Elle est hors service et ses clients retournent dans la file',
+  f_slow: 'Une chambre surchauffe et tourne à demi-vitesse jusqu’à la maintenance de ce soir',
+  b_msg: '10 chambres louées arrivent dans environ 45 s à ${p}/h chacune, rendues ce soir',
+  l_on: 'Limitation des développeurs en libre-service : leur demande −25 %. Plus elle dure, plus vous perdez de communauté', l_off: 'Limitation désactivée',
+  quota: '{m} a atteint la limite du labo ; les requêtes en trop attendent le labo',
+  u: {
+    snap: ['Snapshots mémoire', 'Préparation −75 %. Héberger beaucoup de modèles ouverts coûte moins cher car les démarrages à froid font moins mal.'],
+    fast: ['Équipe compilateur', 'Les modèles ouverts servent 25 % plus vite : les mêmes chambres prennent plus de réservations.'],
+    deal: ['Contrat prépayé de trois ans', '30 chambres de plus pour de bon à $2.35/h. Moins cher que la location, mais payées même vides.'],
+    lane: ['Voie batch de nuit', 'Des tâches image et vidéo en plus, à moitié prix et sans urgence, qui remplissent les chambres chaudes inoccupées des modèles ouverts.'],
+    spot: ['Accord de sous-location spot', 'Les chambres libres rapportent deux fois plus en sous-location.'],
+    devprog: ['Programme développeurs', 'Docs, crédits et hackathons : communauté +8 tout de suite et trafic libre-service +10 %.'],
+  },
+  ev: [
+    { t: 'Jour d’ouverture', x: 'Vous ouvrez avec une clé d’API devant un petit catalogue : trois modèles ouverts dans vos chambres et Horizon 3, un modèle vidéo fermé que vous revendez. Koi 4 est sur le marché mais pas dans votre catalogue ; ceux qui le veulent iront ailleurs si vous ne l’ajoutez pas.',
+      s: 'Parallèle réel : fal vend plus de 1 000 modèles derrière une seule clé. Les modèles fermés comme Veo sont revendus au prix catalogue du labo : la marge de l’agrégateur, c’est la commission que le labo lui laisse.' },
+    { t: 'Double lancement', x: 'Monsoon publie H3, un modèle vidéo ouvert, et Northlight lance Prism 3 Pro, un modèle d’image fermé. L’accès dès le jour zéro à Prism 3 Pro exige une communauté de 55. Monsoon vous propose de créer ensemble une version turbo exclusive de H3.',
+      s: 'Parallèle réel : fal a post-entraîné H3 Max avec MiniMax et FLUX 3 Max avec Black Forest Labs. Les labos lancent dès le jour zéro avec les agrégateurs qui leur amènent des développeurs.' },
+    { t: 'Pénurie de GPU estivale', x: 'Le data center d’un fournisseur est en retard. 25 chambres sont hors ligne aujourd’hui et la location d’urgence coûte trois fois plus cher. Choir Voice, un modèle audio fermé, sort aujourd’hui (exige une communauté de 50).',
+      s: 'Parallèle réel : fal a limité ses clients à l’été 2026 faute de calcul. SemiAnalysis a relevé une hausse de près de 40 % des contrats H100 à un an en cinq mois.',
+      c: [['Limiter le libre-service toute la journée', 'Leur demande −25 %, communauté −3'], ['Tenir sans limiter', 'Aucune limite ; qui ne trouve pas de chambre s’en va']] },
+    { t: 'Le lancement le plus attendu', x: 'Bytewave lance Seedling 2.5, le meilleur modèle vidéo du marché. Il ne sort au jour zéro qu’avec des plateformes dont la communauté atteint 65. Le même jour arrive Kiln Image, un solide modèle d’image ouvert.',
+      s: 'Parallèle réel : Seedance et Kling font partie des modèles les plus demandés en Occident ; Sacra estime que fal et Higgsfield acheminent ensemble environ la moitié de l’inférence occidentale vers eux.' },
+    { t: 'Orbital retire Horizon 3', x: 'Orbital retire Horizon 3 de tous les agrégateurs pour pousser sa propre plateforme, et lance Sparrow Image avec une barre de communauté à 72. Les clients d’Horizon 3 choisissent désormais parmi les autres modèles vidéo que vous proposez.',
+      s: 'Parallèle réel : les endpoints Veo 3.1 de fal ont été retirés en novembre 2026 alors que Veo restait sur Vertex, chez Google ; OpenAI a fermé l’API Sora en septembre 2026.' },
+    { t: 'Lumenfield veut s’émanciper', x: 'Lumenfield, l’app vidéo virale, est devenue l’un de vos plus gros clients. Elle compte signer ses propres contrats GPU et lancer une API concurrente.',
+      s: 'Parallèle réel : Higgsfield a déplacé son calcul vers GMI Cloud (45 % moins cher, selon la presse) et lancé sa propre API de plus de 50 modèles ; les clients d’OpenRouter passent souvent en direct vers un million de dollars.',
+      c: [['Lui accorder 20 % de remise', 'Lumenfield reste et ne vous concurrence pas, mais vous absorbez la remise, même sur les modèles fermés où votre commission est inférieure à 20 %'], ['La laisser partir', 'Vous perdez Lumenfield, et sa nouvelle API vous prend 10 % de vos développeurs en libre-service']] },
+    { t: 'Journée investisseurs', x: 'L’affluence monte de 25 %. À la clôture, les investisseurs vous valorisent sur le revenu annualisé, avec un multiple qui récompense la communauté et les modèles exclusifs et pénalise la dépendance à un seul client.' },
+  ],
+  m_eyebrow: 'Jour {d} sur {n} · Briefing du matin', decide: 'Une décision avant d’ouvrir',
+  sh_title: 'Votre catalogue', sh_hint: 'Ajouter un modèle est gratuit. Les modèles ouverts ont besoin de chambres chaudes dans votre hôtel ; les fermés non, mais vous ne gardez que la commission du labo, et le labo plafonne le nombre de requêtes que vous lui envoyez.',
+  list: 'Ajouter', listed: 'Au catalogue', unlist: 'Retirer', from_day: 'À partir du jour {d}', q: 'qualité {q}', cut: 'commission {x} %', price_x: 'prix ×{x}',
+  dz_ok: 'Accès au jour zéro accordé', dz_no: 'Le labo a choisi des partenaires avec une plus grande communauté (il faut {g}). Vous pourrez l’ajouter demain.', needs: 'exige une communauté de {g}',
+  proj: 'Partenariat avec un labo', turbo: 'Créer un {m} turbo exclusif avec {lab}', turbo_d: '2,9× plus rapide, prix 15 % plus élevé, plus de clients le choisissent, et aucun labo ne peut le retirer. Prêt demain.', turbo_wip: 'En cours · prêt le jour {d}',
+  shop: 'Améliorations en vente (trésorerie {c})', owned_tag: 'Acquise', allbought: 'Vous avez toutes les améliorations.', open: 'Ouvrir l’hôtel', decidefirst: 'Prenez d’abord la décision ci-dessus',
+  e_eyebrow: 'Jour {d} · Fermeture', made: 'Vous avez gagné {x} aujourd’hui', lost: 'Vous avez perdu {x} aujourd’hui',
+  r_open: 'Modèles ouverts sur vos GPU', r_take: 'Votre commission sur la revente des modèles fermés', r_sub: 'Sous-locations', r_rent: 'Loyer des chambres', r_profit: 'Bénéfice du jour', r_gmv: 'Payé par vos clients', r_cov: 'Couverture', r_loss: 'Perte due aux départs', r_cold: 'Démarrages à froid', r_rep: 'Évolution de la communauté', r_cash: 'Trésorerie',
+  ev_strike: '{c} est mécontent de la fiabilité {cat} (avertissement {n} sur 2)', ev_churn: '{c} est parti chez un autre fournisseur',
+  go_broke: 'Plus d’argent', go_last: 'Voir la valorisation', go_next: 'Jour suivant',
+  t_loss: 'Trop de départs. Gardez plus de chambres chaudes pour les modèles que les clients attendent, ou préparez-les avant la pointe. Si un modèle fermé bute souvent sur le quota du labo, proposez une alternative.',
+  t_cov: 'Couverture faible : les clients ont demandé des modèles que vous n’avez pas. Une clé d’API ne vaut que si votre catalogue a ce qu’ils veulent.',
+  t_util: 'Occupation faible. Trop de chambres restent chaudes : vides, elles ne rapportent rien ; fermées, elles se sous-louent.',
+  t_cold: 'Trop de démarrages à froid. Héberger beaucoup de modèles ouverts disperse vos chambres ; gardez-les chaudes plus longtemps ou achetez des snapshots mémoire.',
+  t_ok: 'Belle journée. L’affluence grimpe chaque jour : pensez à de nouveaux modèles, à des versions exclusives et à plus de chambres.',
+  f_eyebrow: 'Verdict des sept jours', rank_broke: 'Liquidation', rank1: 'La plateforme de médias génératifs de la décennie', rank2: 'Place de marché de modèles qui perce', rank3: 'Revendeur d’API solide', rank4: 'Simple surcouche',
+  f_arr: 'CA annualisé (trois derniers jours)', f_base: 'Multiple de base', f_rep: 'Communauté de développeurs {r}', f_excl: 'Modèles exclusifs ×{n}', f_margin: 'Marge brute {p}', f_conc: 'Votre plus gros client pèse {p} du revenu', f_mult: 'Multiple de valorisation',
+  f_profit: 'Bénéfice sur sept jours', f_cash: 'Trésorerie finale', f_best: 'Meilleure valorisation à ce jour',
+  f_note: 'Les investisseurs paient ce qui ne se copie pas : une communauté avec laquelle les labos veulent lancer, des modèles que vous seul avez, et un revenu qui ne tient pas à un seul client.',
+  again: 'Ouvrir un autre hôtel',
+},
+tr: {
+  lang: 'Dil', sub: 'Çıkarım Oteli · Model Pazaryeri',
+  intro: 'Tek API anahtarı, tüm modeller. 100 GPU’luk otelin başka laboratuvarların modellerini de satıyor. Açık modeller senin odalarında çalışır ve fiyatın tamamı senin; kapalı modeller laboratuvarın odalarında çalışır ve sana yalnızca laboratuvarın verdiği pay kalır. Rafını seç, doğru odaları sıcak tut ve yedi günde değerlemeni büyüt.',
+  pause: 'Duraklat', resume: 'Devam', a_kpis: 'Otel göstergeleri', a_grid: 'Oda durumu',
+  k_cash: 'Nakit', k_today: 'Bugünkü kâr', k_rep: 'Geliştirici topluluğu (trafik ve laboratuvar erişimi)', k_cov: 'Kapsama (karşılayabildiğin talep)', k_lost: 'Bugün kaçan misafir kaybı',
+  day: '{n}. gün', clock: '{time} · {n} günlük oyun',
+  c_img: 'Görsel', c_vid: 'Video', c_aud: 'Ses',
+  lg_vac: 'Boş (spot piyasada kirada)', lg_prep: 'Hazırlanıyor (soğuk başlatma)', lg_warm: 'Sıcak, misafir yok', lg_down: 'Arızalı', lg_tb: 'Özel turbo model',
+  k_open: 'Açık · senin GPU’ların', k_closed: 'Kapalı · yeniden satış', k_turbo: 'Özel turbo', k_new: 'Bugün yeni',
+  chart: 'Bugünkü doluluk (kategoriye göre kullanılan odalar; kesikli çizgi = açık odalar). Kapalı modeller oda kullanmaz.',
+  cust: 'Müşteriler', ccols: ['Müşteri', 'Kullanım', 'Bugün ödenen', 'Senin gelirin', 'Durum'], cust_hint: 'Müşteriler bir otel değil, bir model seçer. İstedikleri model rafında yoksa çoğu o isteği başka yere götürür.',
+  st_active: 'Aktif', st_strike: 'Memnun değil', st_churn: 'Ayrıldı', st_deal: 'İndirimde', st_gone: 'Kendi yoluna gitti',
+  cn: { self: 'Self-servis geliştiriciler', lumen: 'Lumenfield · viral video uygulaması', canvas: 'Canvasly · tasarım platformu', shop: 'Shopwave · e-ticaret', parrot: 'Parrot Learn · dil uygulaması' },
+  owned: 'Alınan yükseltmeler', none: 'Henüz yok',
+  shelf: 'Model rafı · tek API anahtarı', shelf_none: 'Rafta model yok',
+  row_open: '{cat} talebinin <b>{share}</b> kadarı · kuyruk <b>{q}</b> · P95 <b>{p}s</b> · oda <b>{r}</b> · gelir <b>{rev}</b>',
+  row_closed: '{cat} talebinin <b>{share}</b> kadarı · laboratuvar kotası <b>{u}</b> · P95 <b>{p}s</b> · senin payın <b>{rev}</b>',
+  mw: 'Min. sıcak oda',
+  policy: 'Otel politikası', keep: 'Boşalınca sıcak tut',
+  win: 'Toplu bekleme: başlamadan önce daha dolu bir parti bekle. Dolu partiler daha az oda kullanır ama misafirler biraz daha bekler',
+  surge: 'Açık modellerde yoğunluk zammı tavanı: doluluk %80’i aşınca fiyat artar ve daha az misafir gelir',
+  order: 'Odaya önce kim girer', o_fifo: 'Gitmek üzere olan', o_rich: 'En çok ödeyen', o_short: 'En kısa iş',
+  burst: 'Hemen 10 oda kirala', limit: 'Self-servis geliştiricileri sınırla',
+  bhint: 'Kiralık oda saatte ${b} (kendi odan ${o}, boş odanın kira geliri ${s}). Bugün {n} kiralama hakkın kaldı.',
+  basis: 'Sayılar nereden geliyor', bcols: ['Mekanik', 'Oyunda', 'Kaynak'],
+  brows: [
+    ['Açık modeller: hizmet / hazırlık', 'görsel 3–4 sn / 20–25 sn · video 60–75 sn / 90–100 sn · ses 1,5 sn / 15 sn', 'Flux schnell 0,7 sn, SDXL TensorRT 1,5 sn, Flux dev 3–5 sn (tahmin); barındırılan 5 saniyelik klip medyanda ~60 sn (Kling); Modal 11–120 sn soğuk başlatma ölçtü'],
+    ['Kapalı modeller', 'liste fiyatından satış · payın %10–25', 'Veo 3.1 Standard Google, fal, Replicate ve Vercel’de aynı fiyata, saniyesi $0,40. Toptan paylar kamuya açık değil; %10–25 bir tahmin'],
+    ['Yeniden satış ve kendi modelin', 'ince pay ve tam fiyat', 'Higgsfield, üçüncü taraf kapalı modellerde %20–30, kendi son-eğitimli modellerinde %80+ brüt marj elde ettiğini söylüyor (Sacra aracılığıyla şirket beyanı)'],
+    ['Özel turbo', '2,9× daha hızlı · fiyat +%15', 'fal, H3 Max’in MiniMax’in kendi uç noktasından ~35× hızlı çalıştığını söylüyor (sağlayıcı beyanı); oyun daha küçük bir artış kullanıyor'],
+    ['Genişlik', 'kategori başına 3–5 model', 'a16z’nin aktardığı bir fal raporuna göre kurumsal kurulum başına medyan 14 model; en iyi video modelleri ~30 gün popüler kalıyor (burada günlere sıkıştırıldı)'],
+    ['Yayından kaldırma', '5. gün', 'fal’ın Veo 3.1 uç noktaları Kasım 2026’da kaldırıldı; OpenAI Sora API’sini Eylül 2026’da kapattı'],
+    ['Kendi yoluna gitme', '6. gün', 'OpenRouter müşterileri ~1 milyon dolar harcamaya ulaşınca doğrudan sağlayıcıya geçme eğiliminde; Higgsfield hesaplamasını GMI Cloud’a taşıdı ve kendi API’sini çıkardı'],
+    ['Kira / acil / devir kirası', 'GPU-saat başına $2.6 / $4.5 / $1.5', 'H100 sözleşmesi $2,35–2,90, neocloud isteğe bağlı $2,89–4,39; bellek anlık görüntüsü hazırlığı 45 sn’den 5 sn’ye indiriyor (Modal)'],
+    ['Kim kimdir', 'kurgusal isimler', 'Prism ≈ FLUX, Horizon ≈ Veo, Koi ≈ Kling, Monsoon H3 ≈ MiniMax H3, Seedling ≈ Seedance, Orbital ≈ Google, Lumenfield ≈ Higgsfield, Canvasly ≈ Canva. Kabaca benzerlik, birebir tasvir değil'],
+  ],
+  bnote: 'Mekanikler ve büyüklük sıraları kamuya açık kaynaklardan. Fiyatlar, trafik, paylar ve olay şiddeti oynanış için ayarlandı, gerçek fiyat değildir.',
+  f_hard: 'Bir odada donanım arızası çıktı. Oda kullanım dışı, misafirleri kuyruğa döndü',
+  f_slow: 'Bir oda aşırı ısınıyor ve bu akşamki bakıma kadar yarı hızda çalışıyor',
+  b_msg: 'Kiralık 10 oda yaklaşık 45 sn içinde geliyor, tanesi saatte ${p}; bu gece iade edilecek',
+  l_on: 'Self-servis geliştiriciler sınırlanıyor: talepleri −%25. Ne kadar uzun sürerse o kadar topluluk kaybedersin', l_off: 'Sınırlama kapalı',
+  quota: '{m} laboratuvarın sınırına takıldı; fazla istekler laboratuvarı bekliyor',
+  u: {
+    snap: ['Bellek anlık görüntüsü', 'Oda hazırlığı −%75. Soğuk başlatma daha az acıttığı için çok sayıda açık model barındırmak ucuzlar.'],
+    fast: ['Derleyici ekibi', 'Açık modeller %25 daha hızlı hizmet verir; aynı odalar daha çok rezervasyon alır.'],
+    deal: ['Üç yıllık peşin sözleşme', 'Kalıcı olarak 30 oda daha, tanesi saatte $2.35. Kiralamaktan ucuz ama boş kalsa da ödersin.'],
+    lane: ['Gece toplu iş hattı', 'Yarı fiyatına, acelesiz ek görsel ve video işleri; açık modellerin boşta bekleyen sıcak odalarını doldurur.'],
+    spot: ['Spot devir anlaşması', 'Boş odaların kira geliri ikiye katlanır.'],
+    devprog: ['Geliştirici programı', 'Dokümantasyon, kredi ve hackathon: topluluk hemen +8, self-servis trafik +%10.'],
+  },
+  ev: [
+    { t: 'Açılış günü', x: 'Küçük bir rafın önünde tek bir API anahtarıyla açıyorsun: kendi odalarında üç açık model ve yeniden sattığın kapalı video modeli Horizon 3. Koi 4 piyasada ama rafında değil; onu isteyen müşteriler, rafına eklemezsen başka yere gider.',
+      s: 'Gerçek hayattan: fal tek anahtarın arkasında 1.000’den fazla model satıyor. Veo gibi kapalı modeller laboratuvarın liste fiyatından satılıyor; toplayıcının marjı laboratuvarın bıraktığı pay kadar.' },
+    { t: 'Çifte lansman günü', x: 'Monsoon açık video modeli H3’ü, Northlight da kapalı görsel modeli Prism 3 Pro’yu çıkarıyor. Prism 3 Pro’ya sıfırıncı gün erişim için 55’lik geliştirici topluluğu gerekiyor. Monsoon, H3’ün özel turbo sürümünü seninle birlikte yapmayı teklif ediyor.',
+      s: 'Gerçek hayattan: fal, H3 Max’i MiniMax ile, FLUX 3 Max’i Black Forest Labs ile son-eğitime soktu. Laboratuvarlar sıfırıncı günde kendilerine geliştirici getiren toplayıcılarla çıkıyor.' },
+    { t: 'Yaz GPU kıtlığı', x: 'Bir tedarikçinin veri merkezi gecikti. Bugün 25 oda devre dışı ve acil kiralama üç kat pahalı. Kapalı ses modeli Choir Voice bugün çıkıyor (topluluk 50 gerekiyor).',
+      s: 'Gerçek hayattan: fal 2026 yazında hesaplama yetmediği için müşterilerini sınırladı. SemiAnalysis, bir yıllık H100 sözleşme fiyatlarının beş ayda yaklaşık %40 arttığını kaydetti.',
+      c: [['Bütün gün self-servisi sınırla', 'Talepleri −%25, topluluk −3'], ['Dişini sık', 'Sınır yok; oda bulamayan misafir gider']] },
+    { t: 'Sezonun en sıcak lansmanı', x: 'Bytewave piyasanın en iyi video modeli Seedling 2.5’i çıkarıyor. Sıfırıncı günde yalnızca topluluğu en az 65 olan platformlarla çıkıyor. Aynı gün güçlü bir açık görsel modeli olan Kiln Image da geliyor.',
+      s: 'Gerçek hayattan: Seedance ve Kling Batı’da en çok istenen modeller arasında; Sacra, fal ve Higgsfield’in birlikte Batı’daki bu modellere giden çıkarımın yaklaşık yarısını taşıdığını tahmin ediyor.' },
+    { t: 'Orbital, Horizon 3’ü çekiyor', x: 'Orbital kendi platformunu öne çıkarmak için Horizon 3’ü tüm toplayıcılardan çekiyor ve Sparrow Image’ı 72’lik topluluk barajıyla çıkarıyor. Horizon 3’ün müşterileri artık rafındaki diğer video modelleri arasından seçiyor.',
+      s: 'Gerçek hayattan: fal’ın Veo 3.1 uç noktaları Kasım 2026’da kaldırıldı, Veo ise Google’ın kendi Vertex’inde kaldı; OpenAI Sora API’sini Eylül 2026’da kapattı.' },
+    { t: 'Lumenfield kendi yoluna gitmek istiyor', x: 'Viral video uygulaması Lumenfield en büyük müşterilerinden biri oldu. Kendi GPU sözleşmelerini imzalayıp rakip bir API çıkarmayı planlıyor.',
+      s: 'Gerçek hayattan: Higgsfield hesaplamasını GMI Cloud’a taşıdı (bildirildiğine göre %45 daha ucuz) ve 50’den fazla modelli kendi API’sini çıkardı; OpenRouter müşterileri ~1 milyon dolar harcamada doğrudan sağlayıcıya geçme eğiliminde.',
+      c: [['Kalması için %20 indirim ver', 'Lumenfield kalır ve rakip olmaz, ama indirimi sen karşılarsın; payının %20’den az olduğu kapalı modellerde bile'], ['Bırak gitsin', 'Lumenfield’i kaybedersin ve yeni API’si self-servis geliştiricilerinin %10’unu alır']] },
+    { t: 'Yatırımcı demo günü', x: 'Trafik %25 arttı. Kapanışta yatırımcılar seni yıllıklandırılmış gelirden değerliyor; çarpan topluluğu ve özel modelleri ödüllendiriyor, tek müşteriye bağımlılığı cezalandırıyor.' },
+  ],
+  m_eyebrow: 'Gün {d}/{n} · Sabah toplantısı', decide: 'Açmadan önce bir karar',
+  sh_title: 'Rafın', sh_hint: 'Rafa eklemek ücretsiz. Açık modeller otelinde sıcak oda ister; kapalı modeller istemez, ama sana yalnızca laboratuvarın payı kalır ve laboratuvar gönderebileceğin istek sayısını sınırlar.',
+  list: 'Ekle', listed: 'Rafta', unlist: 'Kaldır', from_day: '{d}. günden itibaren', q: 'kalite {q}', cut: 'payın %{x}', price_x: 'fiyat ×{x}',
+  dz_ok: 'Sıfırıncı gün erişimi verildi', dz_no: 'Laboratuvar daha büyük topluluğu olan ortakları seçti ({g} gerekiyor). Yarın ekleyebilirsin.', needs: 'topluluk {g} gerekiyor',
+  proj: 'Laboratuvar ortaklığı', turbo: '{lab} ile özel turbo {m} yap', turbo_d: '2,9× daha hızlı, %15 daha pahalı, daha çok müşteri seçer ve hiçbir laboratuvar onu çekemez. Yarın hazır.', turbo_wip: 'Devam ediyor · {d}. gün hazır',
+  shop: 'Satıştaki yükseltmeler (nakit {c})', owned_tag: 'Alındı', allbought: 'Tüm yükseltmelere sahipsin.', open: 'Oteli aç', decidefirst: 'Önce yukarıdaki kararı ver',
+  e_eyebrow: '{d}. gün · Kapanış', made: 'Bugün {x} kazandın', lost: 'Bugün {x} kaybettin',
+  r_open: 'Senin GPU’larındaki açık modeller', r_take: 'Kapalı model satışından payın', r_sub: 'Devir kirası', r_rent: 'Oda kirası', r_profit: 'Bugünkü kâr', r_gmv: 'Müşterilerin sana ödediği', r_cov: 'Kapsama', r_loss: 'Kaçan misafir kaybı', r_cold: 'Soğuk başlatma', r_rep: 'Topluluk değişimi', r_cash: 'Nakit',
+  ev_strike: '{c}, {cat} güvenilirliğinden memnun değil (uyarı {n}/2)', ev_churn: '{c} başka bir sağlayıcıya geçti',
+  go_broke: 'Para bitti', go_last: 'Değerlemeyi gör', go_next: 'Sonraki gün',
+  t_loss: 'Çok fazla misafir kaçtı. Müşterilerin beklediği modellere daha çok sıcak oda ayır ya da odaları zirveden önce hazırla. Bir kapalı model sık sık laboratuvar kotasına takılıyorsa alternatif sun.',
+  t_cov: 'Kapsama düşük: müşteriler rafında olmayan modelleri istedi. Tek API anahtarı ancak rafında istedikleri varsa işe yarar.',
+  t_util: 'Doluluk düşük. Çok fazla odayı sıcak tutuyorsun; boş sıcak oda para kazanmaz, kapalı oda kiraya verilebilir.',
+  t_cold: 'Çok fazla soğuk başlatma. Çok sayıda açık model odalarını fazla bölüyor; odaları daha uzun sıcak tut ya da bellek anlık görüntüsü al.',
+  t_ok: 'Bugün iyi yönettin. Trafik her gün artıyor; yeni modelleri, özel sürümleri ve daha çok odayı düşün.',
+  f_eyebrow: 'Yedi günün sonucu', rank_broke: 'Tasfiye', rank1: 'On yılın üretken medya platformu', rank2: 'Yükselen model pazaryeri', rank3: 'Sağlam API satıcısı', rank4: 'İnce bir sarmalayıcı',
+  f_arr: 'Yıllıklandırılmış gelir (son üç gün)', f_base: 'Temel çarpan', f_rep: 'Geliştirici topluluğu {r}', f_excl: 'Özel modeller ×{n}', f_margin: 'Brüt marj {p}', f_conc: 'En büyük müşterin gelirin {p} kadarı', f_mult: 'Değerleme çarpanı',
+  f_profit: 'Yedi günlük kâr', f_cash: 'Kapanış nakdi', f_best: 'Şimdiye kadarki en iyi değerleme',
+  f_note: 'Yatırımcılar kopyalanamayana para öder: laboratuvarların birlikte çıkmak istediği bir topluluk, yalnızca sende olan modeller ve tek müşteriye bağlı olmayan gelir.',
+  again: 'Yeni bir otel aç',
+},
+zh: {
+  lang: '语言', sub: '算力酒店 · 模型集市',
+  intro: '一把 API key，所有模型。你的 100 卡酒店也代卖别家实验室的模型。开源模型住在你自己的客房里，房费全归你；闭源模型住在实验室的客房里，你只拿实验室给的分成。选好货架，保温对的房间，七天内把估值做到最高。',
+  pause: '暂停', resume: '继续', a_kpis: '经营指标', a_grid: '客房状态',
+  k_cash: '现金', k_today: '今日利润', k_rep: '开发者社区（决定客流和实验室合作）', k_cov: '覆盖率（你接得住的需求）', k_lost: '今日退单损失',
+  day: '第 {n} 天', clock: '{time} · 共 {n} 天',
+  c_img: '图像', c_vid: '视频', c_aud: '音频',
+  lg_vac: '空置（转租现货）', lg_prep: '备房（冷启动）', lg_warm: '保温待客', lg_down: '故障停用', lg_tb: '独家加速版模型',
+  k_open: '开源 · 你的 GPU', k_closed: '闭源 · 代卖', k_turbo: '独家加速版', k_new: '今日新品',
+  chart: '今日入住曲线（各品类占用的客房数，虚线是开着的客房总数）。闭源模型不占你的客房。',
+  cust: '客户', ccols: ['客户', '用途', '今日付款', '你的收入', '状态'], cust_hint: '客户选的是模型，不是酒店。他们要的模型不在你的货架上，大部分会把这次请求带去别家。',
+  st_active: '正常', st_strike: '不满', st_churn: '已流失', st_deal: '折扣中', st_gone: '已毕业',
+  cn: { self: '自助开发者', lumen: 'Lumenfield · 爆款视频应用', canvas: 'Canvasly · 设计平台', shop: 'Shopwave · 电商', parrot: 'Parrot Learn · 语言学习应用' },
+  owned: '已购升级', none: '还没有',
+  shelf: '模型货架 · 一把 API key', shelf_none: '货架上还没有模型',
+  row_open: '占{cat}需求 <b>{share}</b> · 排队 <b>{q}</b> · P95 <b>{p}s</b> · 房 <b>{r}</b> · 收入 <b>{rev}</b>',
+  row_closed: '占{cat}需求 <b>{share}</b> · 实验室配额已用 <b>{u}</b> · P95 <b>{p}s</b> · 你的分成 <b>{rev}</b>',
+  mw: '最少保温房间',
+  policy: '前台总策略', keep: '空房再保温',
+  win: '拼房等待：攒够一批再开工，批越满越省房，但客人多等一会',
+  surge: '开源模型高峰加价上限：入住率过 80% 逐步加价，客人会变少',
+  order: '抢房顺序', o_fifo: '谁快等不及谁先', o_rich: '谁赚得多谁先', o_short: '短任务先',
+  burst: '紧急加租 10 间', limit: '对自助开发者限流',
+  bhint: '加租每间每小时 ${b}（自有房 ${o}，空房转租回 ${s}），今天还能加 {n} 次。',
+  basis: '数值从哪来', bcols: ['机制', '游戏取值', '依据'],
+  brows: [
+    ['开源模型：服务 / 备房', '图像 3–4s / 20–25s · 视频 60–75s / 90–100s · 音频 1.5s / 15s', 'Flux schnell 0.7s、SDXL TensorRT 1.5s、Flux dev 3–5s（估计）；托管模型 5 秒视频片段中位约 60s（Kling）；Modal 实测冷启动 11–120s'],
+    ['闭源模型', '按官方价代卖 · 分成 10–25%', 'Veo 3.1 标准版在 Google、fal、Replicate、Vercel 都是每秒 $0.40。批发分成未公开，10–25% 为估计'],
+    ['代卖与自有模型', '薄分成 vs 全价', 'Higgsfield 称转售第三方闭源模型毛利 20–30%，自己后训练的模型超过 80%（公司说法，经 Sacra 转述）'],
+    ['独家加速版', '快 2.9 倍 · 加价 15%', 'fal 称 H3 Max 吞吐约为 MiniMax 官方端点的 35 倍（厂商说法）；游戏用了更小的提升'],
+    ['货架广度', '每个品类 3–5 个模型', 'a16z 引用的 fal 报告称企业生产部署的模型中位数是 14 个；头部视频模型约 30 天热度（游戏里压缩成几天）'],
+    ['下架', '第 5 天', 'fal 的 Veo 3.1 端点 2026 年 11 月下线；OpenAI 2026 年 9 月关停了 Sora API'],
+    ['大客户毕业', '第 6 天', 'OpenRouter 的客户花到约 100 万美元就倾向直连；Higgsfield 把算力迁往 GMI Cloud 并推出了自己的 API'],
+    ['租金 / 加租 / 转租', '$2.6 / $4.5 / $1.5 每卡时', 'H100 合同价 $2.35–2.90，neocloud 按需 $2.89–4.39；内存快照把备房从 45s 压到 5s（Modal）'],
+    ['谁是谁', '虚构名称', 'Prism ≈ FLUX，Horizon ≈ Veo，Koi ≈ 可灵，Monsoon H3 ≈ MiniMax H3，Seedling ≈ Seedance，Orbital ≈ Google，Lumenfield ≈ Higgsfield，Canvasly ≈ Canva。只是大致对应，不是写真'],
+  ],
+  bnote: '机制和量级取自公开资料，房费、客流、分成和事件强度为游戏平衡做了调整，不能当作真实报价。',
+  f_hard: '一间客房硬件故障停用，订单已重新排队',
+  f_slow: '一间客房过热降速，接单只有一半速度，今晚检修',
+  b_msg: '加租的 10 间客房约 45 秒后到位，每间每小时 ${p}，今晚退租',
+  l_on: '正在对自助开发者限流：他们的需求 −25%，开得越久社区掉得越多', l_off: '已取消限流',
+  quota: '{m} 撞上实验室的限流，多出的请求在等实验室',
+  u: {
+    snap: ['内存快照', '备房时间 −75%。冷启动不那么疼了，同时托管很多开源模型也划算。'],
+    fast: ['编译器团队', '开源模型服务时间 −25%，同样的房能接更多单。'],
+    deal: ['三年期预付合同', '永久多 30 间客房，每间每小时 $2.35，比现租便宜，但空着也要付。'],
+    lane: ['隔夜批处理通道', '多出一批半价、不催的图像和视频任务，填满开源模型空着的保温房。'],
+    spot: ['现货转租协议', '空置客房的转租收入翻倍。'],
+    devprog: ['开发者计划', '文档、免费额度和黑客松：社区立刻 +8，自助开发者客流 +10%。'],
+  },
+  ev: [
+    { t: '开业第一天', x: '你拿着一把 API key 开张，货架不大：三个开源模型住在自己的客房里，再加一个代卖的闭源视频模型 Horizon 3。Koi 4 在市场上，但不在你的货架上；想用它的客户会去别家，除非你把它上架。',
+      s: '行业原型：fal 用一把 key 卖 1000 多个模型。Veo 这类闭源模型按实验室官方价代卖，聚合商的毛利就是实验室给的那点分成。' },
+    { t: '双首发日', x: 'Monsoon 发布开源视频模型 H3，Northlight 推出闭源图像模型 Prism 3 Pro。Prism 3 Pro 的零日首发要求开发者社区达到 55。Monsoon 提议和你一起做 H3 的独家加速版。',
+      s: '行业原型：fal 和 MiniMax 一起后训练了 H3 Max，和 Black Forest Labs 一起做了 FLUX 3 Max。实验室零日首发，会选能带来开发者的聚合商。' },
+    { t: '夏季算力荒', x: '供应商机房延期交付，今天 25 间客房用不了，紧急加租的价格涨到三倍。闭源音频模型 Choir Voice 今天首发（要求社区 50）。',
+      s: '行业原型：fal 在 2026 年夏天因算力不足对客户限流。SemiAnalysis 记录 H100 一年期合同价五个月涨近四成。',
+      c: [['全天对自助开发者限流', '他们的需求 −25%，社区 −3'], ['硬扛，不限流', '不设限，排不上的订单会退单']] },
+    { t: '本季最热首发', x: 'Bytewave 推出 Seedling 2.5，市面上最好的视频模型。它只和社区达到 65 的平台零日首发。同一天，实力不俗的开源图像模型 Kiln Image 也发布了。',
+      s: '行业原型：Seedance 和可灵是西方需求最大的模型之一；Sacra 估算 fal 和 Higgsfield 合计承载了西方流向它们的约一半推理量。' },
+    { t: 'Orbital 撤下 Horizon 3', x: '为了推自家平台，Orbital 把 Horizon 3 从所有聚合商下架，同时推出门槛为社区 72 的 Sparrow Image。原来用 Horizon 3 的客户，现在只能在你货架上的其他视频模型里挑。',
+      s: '行业原型：fal 的 Veo 3.1 端点 2026 年 11 月下线，而 Veo 仍留在 Google 自家的 Vertex 上；OpenAI 2026 年 9 月关停了 Sora API。' },
+    { t: 'Lumenfield 要毕业', x: '爆款视频应用 Lumenfield 已经长成你最大的客户之一，打算自己去签 GPU 长约，还要推出一个和你竞争的 API。',
+      s: '行业原型：Higgsfield 把算力迁往 GMI Cloud（据称降本 45%），并推出了覆盖 50 多个模型的自家 API；OpenRouter 的客户花到约 100 万美元就倾向直连。',
+      c: [['给它八折留下', 'Lumenfield 留下且不跟你竞争，但折扣由你承担，连分成不到 20% 的闭源模型也一样'], ['放手', '失去 Lumenfield，它的新 API 还会抢走你 10% 的自助开发者']] },
+    { t: '融资路演日', x: '全天客流 +25%。收盘时投资人按年化收入给你估值，倍数奖励社区和独家模型，惩罚对单一客户的依赖。' },
+  ],
+  m_eyebrow: '第 {d} 天 / 共 {n} 天 · 晨会', decide: '开门前要做一个决定',
+  sh_title: '你的货架', sh_hint: '上架免费。开源模型要在你酒店里占保温房；闭源模型不占房，但你只拿实验室的分成，而且实验室限制你能转发多少请求。',
+  list: '上架', listed: '已上架', unlist: '下架', from_day: '第 {d} 天起', q: '质量 {q}', cut: '分成 {x}%', price_x: '价格 ×{x}',
+  dz_ok: '拿到零日首发', dz_no: '实验室选了开发者社区更大的合作方（要求 {g}）。明天你才能上架。', needs: '要求社区 {g}',
+  proj: '实验室合作', turbo: '和 {lab} 一起做独家加速版 {m}', turbo_d: '快 2.9 倍，价格高 15%，更多客户会选它，而且没有实验室能把它撤走。明天就绪。', turbo_wip: '进行中 · 第 {d} 天就绪',
+  shop: '可购升级（现金 {c}）', owned_tag: '已购', allbought: '都买齐了。', open: '开门营业', decidefirst: '先做完上面的决定',
+  e_eyebrow: '第 {d} 天 · 打烊结算', made: '今天赚了 {x}', lost: '今天亏了 {x}',
+  r_open: '自有 GPU 上的开源模型', r_take: '闭源代卖的分成', r_sub: '转租收入', r_rent: '客房租金', r_profit: '今日利润', r_gmv: '客户付给你的总额', r_cov: '覆盖率', r_loss: '退单损失', r_cold: '冷启动次数', r_rep: '社区变化', r_cash: '现金',
+  ev_strike: '{c} 对{cat}的稳定性不满（警告 {n}/2）', ev_churn: '{c} 换了别家供应商',
+  go_broke: '资金链断了', go_last: '看估值', go_next: '第二天',
+  t_loss: '退单偏多：给客户在等的模型多留保温房，或者在高峰前就把房备好。闭源模型总撞实验室配额的话，要备一个替代品。',
+  t_cov: '覆盖率偏低：客户要的模型你没上架。一把 API key 只有在货架上有他们想要的东西时才管用。',
+  t_util: '入住率偏低：保温太多了。空着的保温房一分钱不挣，关掉还能转租。',
+  t_cold: '备房太频繁：开源模型托管太多，客房被摊薄了。保温时长调长一点，或者买内存快照。',
+  t_ok: '今天调度得不错。客流每天都在涨，想想新模型、独家版本和加房。',
+  f_eyebrow: '七日终局', rank_broke: '破产清算', rank1: '十年一遇的生成媒体平台', rank2: '明星模型集市', rank3: '稳健的 API 代理商', rank4: '薄薄一层套壳',
+  f_arr: '年化收入（按最后三天）', f_base: '基础倍数', f_rep: '开发者社区 {r}', f_excl: '独家模型 ×{n}', f_margin: '毛利率 {p}', f_conc: '最大客户占收入 {p}', f_mult: '估值倍数',
+  f_profit: '七天累计利润', f_cash: '期末现金', f_best: '历史最高估值',
+  f_note: '投资人为抄不走的东西买单：实验室愿意一起首发的开发者社区、只有你有的模型，以及不押在单一客户身上的收入。',
+  again: '再开一家',
+},
+};
+const LANGS = [['en', 'EN', 'English'], ['es', 'ES', 'Español'], ['fr', 'FR', 'Français'], ['tr', 'TR', 'Türkçe'], ['zh', 'ZH', '中文']];
+let lang = 'en';
+try { const s = localStorage.getItem('gpuhotel-lang'); if (L[s]) lang = s; } catch (e) {}
+const tr = () => L[lang];
+function T(k, v) { let s = L[lang][k]; if (s == null) s = L.en[k]; return v ? String(s).replace(/\{(\w+)\}/g, (_, x) => v[x]) : s; }
+
+// ================= world =================
+const DAY = 720, DAYS = 7, SCALE = 86400 / DAY;   // a day is squeezed into 720 ticks; money is billed as a real 24 hours
+const RATE = { own: 2.6, burst: 4.5, sublet: 1.5, contract: 2.35 };   // $ per GPU-hour
+const CK = ['img', 'vid', 'aud'];
+// reference open model per category: gpuEq = rooms needed at the day-1 peak if every request ran on it; hr = revenue per fully busy room-hour
+const CATS = {
+  img: { pat: 30, gpuEq: 56, svc: 3, batch: 4, bpen: .75, hr: 8.5, center: .6 },
+  vid: { pat: 300, gpuEq: 62, svc: 60, batch: 1, bpen: 0, hr: 8, center: .78 },
+  aud: { pat: 8, gpuEq: 26, svc: 1.5, batch: 8, bpen: .1, hr: 6.5, center: .42 },
+};
+for (const c of CK) { const C = CATS[c]; const full = C.svc * (1 + C.bpen * (C.batch - 1)); C.thr = C.batch / full; C.base = C.gpuEq * C.thr; C.r = C.hr / (C.thr * 3600); }
+// q = quality; open: rel = price vs. category reference; closed: gmv = list price vs. reference, take = your cut, lsvc = lab latency, quota = lab cap as share of category base rate
+const CATALOG = [
+  { id: 'p2', name: 'Prism 2 Dev', lab: 'Northlight', cat: 'img', kind: 'open', q: 70, rel: 1, svc: 3, cold: 20, batch: 4, bpen: .75, day: 1, hl: 6, coDev: true },
+  { id: 'p3', name: 'Prism 3 Pro', lab: 'Northlight', cat: 'img', kind: 'closed', q: 86, gmv: 2.2, take: .2, lsvc: 6, quota: 1, day: 2, hl: 4, gate: 55 },
+  { id: 'kiln', name: 'Kiln Image', lab: 'Kiln Collective', cat: 'img', kind: 'open', q: 80, rel: 1.1, svc: 4, cold: 25, batch: 4, bpen: .7, day: 4, hl: 5 },
+  { id: 'spar', name: 'Sparrow Image', lab: 'Orbital', cat: 'img', kind: 'closed', q: 92, gmv: 2.6, take: .1, lsvc: 5, quota: .9, day: 5, hl: 5, gate: 72 },
+  { id: 'wave', name: 'Wavefront 2', lab: 'Tidewater', cat: 'vid', kind: 'open', q: 70, rel: 1, svc: 60, cold: 90, batch: 1, bpen: 0, day: 1, hl: 6 },
+  { id: 'hor', name: 'Horizon 3', lab: 'Orbital', cat: 'vid', kind: 'closed', q: 88, gmv: 3, take: .12, lsvc: 70, quota: .5, day: 1, hl: 7, removeDay: 5 },
+  { id: 'koi', name: 'Koi 4', lab: 'Koi Studio', cat: 'vid', kind: 'closed', q: 84, gmv: 2.4, take: .25, lsvc: 80, quota: .45, day: 1, hl: 6 },
+  { id: 'mon', name: 'Monsoon H3', lab: 'Monsoon', cat: 'vid', kind: 'open', q: 82, rel: 1.25, svc: 75, cold: 100, batch: 1, bpen: 0, day: 2, hl: 5, coDev: true },
+  { id: 'seed', name: 'Seedling 2.5', lab: 'Bytewave', cat: 'vid', kind: 'closed', q: 92, gmv: 2.8, take: .15, lsvc: 90, quota: .6, day: 4, hl: 5, gate: 65 },
+  { id: 'echo', name: 'Echo TTS', lab: 'Open Voice', cat: 'aud', kind: 'open', q: 72, rel: 1, svc: 1.5, cold: 15, batch: 8, bpen: .1, day: 1, hl: 8 },
+  { id: 'choir', name: 'Choir Voice', lab: 'Choir', cat: 'aud', kind: 'closed', q: 88, gmv: 2.5, take: .2, lsvc: 2, quota: 1.2, day: 3, hl: 6, gate: 50 },
+];
+const MI = Object.fromEntries(CATALOG.map(m => [m.id, m]));
+// customers: f = share of each category's base demand on day 1, g = daily growth
+const CUST = [
+  { id: 'self', f: { img: .5, vid: .45, aud: .5 }, g: 1.07 },
+  { id: 'lumen', f: { img: .1, vid: .3, aud: 0 }, g: 1.38 },
+  { id: 'canvas', f: { img: .28, vid: 0, aud: .15 }, g: 1.04, strict: 'img' },
+  { id: 'shop', f: { img: .12, vid: .25, aud: 0 }, g: 1.1 },
+  { id: 'parrot', f: { img: 0, vid: 0, aud: .35 }, g: 1.07, strict: 'aud' },
+];
+const UPG = [{ id: 'snap', cost: 12000 }, { id: 'fast', cost: 18000 }, { id: 'deal', cost: 15000 }, { id: 'lane', cost: 8000 }, { id: 'spot', cost: 6000 }, { id: 'devprog', cost: 8000 }];
+const TURBO_COST = 25000;
+const G = { day: 1, cash: 30000, rep: 60, up: {}, listed: new Set(['p2', 'wave', 'echo', 'hor']), avail: {}, turbo: {}, act: { self: true, lumen: true, canvas: true, shop: true, parrot: true },
+  pm: {}, strikes: {}, selfMult: 1, hist: [], notes: [] };
+const P = { minWarm: { p2: 6, wave: 10, echo: 3 }, keep: 60, win: .2, surge: 1, policy: 'fifo' };
+let D, t = 0, speed = 1, paused = true, running = false, gpus = [], Q = {}, QB, lat = {}, chart = [], cardView = null, lastSay = null;
+const mk = (kind, rate) => ({ m: null, state: 'off', until: 0, idleSince: 0, batch: null, mult: 1, kind, rate, lane: false });
+for (let i = 0; i < 100; i++) gpus.push(mk('own', RATE.own));
+
+// event mechanics; their words live in L[lang].ev
+const EVENTS = [
+  { setup() { D.mult = .9; } },
+  {},
+  { setup() { takeDown(25, DAY); D.burstMult = 3; }, choices: [{ fn() { D.limitAll = true; G.rep -= 3; } }, { fn() {} }] },
+  {},
+  {},
+  { choices: [{ fn() { G.pm.lumen = .8; } }, { fn() { G.act.lumen = false; G.gone = 'lumen'; G.selfMult *= .9; } }] },
+  { setup() { D.mult = 1.25; } },
+];
+
+// ================= helpers =================
+function poisson(l) { if (l <= 0) return 0; if (l > 30) return Math.max(0, Math.round(l + Math.sqrt(l) * gauss())); let L0 = Math.exp(-l), k = 0, p = 1; do { k++; p *= Math.random(); } while (p > L0); return k - 1; }
+function gauss() { return Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(6.283 * Math.random()); }
+function demand(c, d) { const x = d - CATS[c].center; return .08 + .92 * Math.exp(-(x * x) / (2 * .2 * .2)); }
+const $ = id => document.getElementById(id);
+const money = v => (v < 0 ? '−$' : '$') + Math.round(Math.abs(v)).toLocaleString('en-US');
+const pctf = v => Math.round(v * 100) + '%';
+function pct(a, p) { if (!a || !a.length) return 0; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; }
+const removed = m => m.removeDay && G.day >= m.removeDay;
+const inMarket = m => G.day >= m.day && !removed(m);
+const isListed = m => G.listed.has(m.id) && !removed(m);
+const isTurbo = m => G.turbo[m.id] && G.day >= G.turbo[m.id];
+const availDay = m => G.avail[m.id] != null ? G.avail[m.id] : m.day;
+const openListed = () => CATALOG.filter(m => m.kind === 'open' && isListed(m));
+const closedListed = () => CATALOG.filter(m => m.kind === 'closed' && isListed(m));
+function hype(m) { const age = Math.max(0, G.day - m.day + (D ? D.t / DAY : 0)); return .35 + 1.65 * Math.pow(.5, age / m.hl); }
+function attract(m) {
+  const price = m.kind === 'open' ? m.rel * (isTurbo(m) ? 1.15 : 1) : m.gmv / 1.6;
+  return hype(m) * Math.pow(m.q / 75, 4) * Math.pow(price, -.8) * (isTurbo(m) ? 1.4 : 1);
+}
+const mSvc = m => m.svc * (G.up.fast ? .75 : 1) * (isTurbo(m) ? .35 : 1);
+const mCold = m => Math.max(1, Math.round(m.cold * (G.up.snap ? .25 : 1) * (D && D.coldMult[m.id] || 1)));
+const listPrice = m => CATS[m.cat].r * SCALE * (m.kind === 'open' ? m.rel * (isTurbo(m) ? 1.15 : 1) : m.gmv);
+function cnt(id, st) { let n = 0; for (const g of gpus) if (g.m === id && g.state !== 'down' && (!st || g.state === st)) n++; return n; }
+function cst(st) { let n = 0; for (const g of gpus) if (g.state === st) n++; return n; }
+function say(fn) { lastSay = fn; $('ticker').textContent = fn(); }
+function custScale(k) { return Math.pow(k.g, G.day - 1) * (k.id === 'self' ? (.7 + G.rep / 100 * .5) * G.selfMult : 1); }
+
+// ================= simulation =================
+function takeDown(n, dur) {
+  const pool = gpus.filter(g => g.state !== 'down');
+  for (let i = 0; i < n && pool.length; i++) {
+    const g = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    if (g.batch) { if (g.lane) QB[MI[g.m].cat].unshift(...g.batch.map(r => r.t)); else (Q[g.m] || []).unshift(...g.batch); g.batch = null; }
+    g.state = 'down'; g.m = null; g.until = t + dur; g.lane = false;
+  }
+}
+function acquire(id, steal) {
+  let g = gpus.find(g => g.state === 'off');
+  if (!g && steal) {
+    let best = null;
+    for (const c of gpus) if (c.state === 'idle' && c.m !== id && cnt(c.m) > (P.minWarm[c.m] || 0) && (!best || c.idleSince < best.idleSince)) best = c;
+    g = best;
+  }
+  if (!g) return false;
+  g.m = id; g.state = 'loading'; g.until = t + mCold(MI[id]); D.cold++;
+  return true;
+}
+function startJob(g, m, q, lane) {
+  const n = Math.min(m.batch, q.length);
+  g.batch = q.splice(0, n); g.state = 'busy'; g.mult = lane ? .5 : D.surge; g.lane = lane;
+  g.until = t + Math.max(1, Math.round(mSvc(m) * (1 + m.bpen * (n - 1)) * (g.slow ? 2 : 1)));
+}
+function serve(m, r, latency, mult) {
+  const k = r.k, pm = G.pm[k] || 1, list = listPrice(m) * mult;
+  const rev = m.kind === 'open' ? list * pm : list * (pm - 1 + m.take);
+  if (m.kind === 'open') D.revOpen += rev; else D.revTake += rev;
+  D.gmv += list * pm; D.servedV += list; D.mrev[m.id] = (D.mrev[m.id] || 0) + rev;
+  const K = D.kc[k]; K.paid += list * pm; K.rev += rev; K[m.cat].s += list;
+  const L0 = lat[m.id]; if (L0.length < 3000) L0.push(latency); else L0[Math.floor(Math.random() * 3000)] = latency;
+}
+function lose(m, r) { const v = listPrice(m); D.lostV += v; D.kc[r.k][m.cat].l += v; D.mlost[m.id] = (D.mlost[m.id] || 0) + v; }
+function step() {
+  t++; D.t++;
+  const d = D.t / DAY;
+  const busy = cst('busy'), live = gpus.length - cst('down');
+  D.util = D.util * .95 + (busy / Math.max(1, live)) * .05;
+  D.surge = D.util > .8 ? 1 + Math.min(1, (D.util - .8) / .15) * (P.surge - 1) : 1;
+  const elastic = Math.pow(D.surge, -1.3);
+  if (D.limit || D.limitAll) D.limitTicks++;
+  if (Math.random() < 1 / 2400) { takeDown(1, 150); say(() => T('f_hard')); }
+  if (Math.random() < 1 / 300) { const g = gpus[Math.floor(Math.random() * gpus.length)]; if (!g.slow) { g.slow = true; say(() => T('f_slow')); } }
+  // arrivals: every request picks a model from the whole market; you only get it if that model is on your shelf
+  for (const c of CK) {
+    const mkt = CATALOG.filter(m => m.cat === c && inMarket(m)); if (!mkt.length) continue;
+    const A = mkt.map(attract), SA = A.reduce((a, b) => a + b, 0);
+    let best = null, bestA = -1; mkt.forEach((m, i) => { if (isListed(m) && A[i] > bestA) { best = m; bestA = A[i]; } });
+    let bump = 1; for (const m of mkt) if (m.day === G.day) bump += .35 * Math.pow(.5, d / .35);
+    if (D.gust[c] > t) bump *= D.gustM[c]; else if (c !== 'vid' && Math.random() < 1 / 100) { D.gust[c] = t + 12 + Math.random() * 20; D.gustM[c] = 1.7 + Math.random(); }
+    for (const k of CUST) {
+      if (!G.act[k.id] || !k.f[c]) continue;
+      let lam = CATS[c].base * demand(c, d) * k.f[c] * custScale(k) * D.mult * elastic * bump;
+      if ((D.limit || D.limitAll) && k.id === 'self') lam *= .75;
+      const n = poisson(lam);
+      for (let i = 0; i < n; i++) {
+        let x = Math.random() * SA, j = 0; while (j < A.length - 1 && x > A[j]) { x -= A[j]; j++; }
+        let m = mkt[j];
+        if (!isListed(m)) { if (best && Math.random() < .3) m = best; else { D.missV += listPrice(m); continue; } }
+        D.inV += listPrice(m); Q[m.id].push({ t, k: k.id });
+      }
+    }
+    if (G.up.lane && c !== 'aud') { const b = poisson(CATS[c].base * .2 * Math.pow(1.08, G.day - 1)); for (let i = 0; i < b; i++) QB[c].push(t); if (QB[c].length > 3000) QB[c].length = 3000; }
+  }
+  // closed models: the lab serves them, up to its quota
+  for (const m of closedListed()) {
+    const q = Q[m.id], C = CATS[m.cat];
+    const add = m.quota * C.base * Math.pow(1.08, G.day - 1) * demand(m.cat, d);
+    D.cap[m.id] = Math.min(add * 2 + 1, (D.cap[m.id] || 0) + add); D.capT[m.id] = (D.capT[m.id] || 0) + add;
+    while (q.length && D.cap[m.id] >= 1) { const r = q.shift(); D.cap[m.id]--; D.capU[m.id] = (D.capU[m.id] || 0) + 1; serve(m, r, t - r.t + m.lsvc, 1); }
+    const lim = Math.max(2, C.pat - m.lsvc);
+    let hit = false; while (q.length && t - q[0].t > lim) { lose(m, q.shift()); hit = true; }
+    if (hit && !D.quotaSaid[m.id]) { D.quotaSaid[m.id] = 1; const nm = m.name; say(() => T('quota', { m: nm })); }
+  }
+  // open models: walkouts, finished rooms
+  const opens = openListed();
+  for (const m of opens) { const q = Q[m.id], pat = CATS[m.cat].pat; while (q.length && t - q[0].t > pat) lose(m, q.shift()); }
+  for (const g of gpus) {
+    if (g.state === 'busy' && t >= g.until) {
+      const m = MI[g.m];
+      if (g.lane) { const v = listPrice(m) * .5 * g.batch.length; D.revOpen += v; D.gmv += v; }
+      else for (const r of g.batch) serve(m, r, t - r.t, g.mult);
+      g.state = 'idle'; g.idleSince = t; g.batch = null; g.lane = false;
+    } else if (g.state === 'loading' && t >= g.until) { g.state = 'idle'; g.idleSince = t; }
+    else if (g.state === 'down' && t >= g.until) { g.state = 'off'; }
+  }
+  const urg = m => (Q[m.id].length ? t - Q[m.id][0].t : -1) / CATS[m.cat].pat;
+  const order = opens.slice().sort((a, b) => P.policy === 'rich' ? listPrice(b) * b.batch / mSvc(b) - listPrice(a) * a.batch / mSvc(a) : P.policy === 'short' ? mSvc(a) - mSvc(b) : urg(b) - urg(a));
+  for (const m of order) {
+    const q = Q[m.id], wait = P.win * CATS[m.cat].pat * .25;
+    for (const g of gpus) {
+      if (!q.length) break;
+      if (g.state !== 'idle' || g.m !== m.id) continue;
+      if (q.length < m.batch && t - q[0].t < wait) break;
+      startJob(g, m, q, false);
+    }
+  }
+  for (const m of order) {
+    const q = Q[m.id];
+    let need = Math.ceil(q.length / m.batch) - cnt(m.id, 'loading');
+    if (q.length && t - q[0].t < 1) need = 0;
+    while (need-- > 0 && acquire(m.id, true)) {}
+    let lack = (P.minWarm[m.id] || 0) - cnt(m.id);
+    while (lack-- > 0 && acquire(m.id, false)) {}
+    const qb = QB[m.cat];
+    if (qb && qb.length && !q.length) for (const g of gpus) { if (!qb.length) break; if (g.state === 'idle' && g.m === m.id && t - g.idleSince > 2) startJob(g, m, qb.splice(0, m.batch).map(x => ({ t: x, k: 'self' })), true); }
+  }
+  let cost = 0, off = 0;
+  for (const g of gpus) {
+    if (g.state === 'idle' && (!G.listed.has(g.m) || removed(MI[g.m]) || (t - g.idleSince > P.keep && cnt(g.m) > (P.minWarm[g.m] || 0)))) { g.state = 'off'; g.m = null; }
+    if (g.state === 'off') off++;
+    cost += g.rate;
+  }
+  D.sub += off * RATE.sublet * (G.up.spot ? 2 : 1) / 3600 * SCALE;
+  D.cost += cost / 3600 * SCALE;
+  if (D.t % 6 === 0) chart.push(CK.map(c => gpus.reduce((n, g) => n + (g.state === 'busy' && g.m && MI[g.m].cat === c ? 1 : 0), 0)).concat([gpus.length - cst('off') - cst('down')]));
+  if (D.t >= DAY) endDay();
+}
+
+// ================= day flow =================
+function newDay() {
+  D = { t: 0, coldMult: {}, gust: {}, gustM: {}, cap: {}, capT: {}, capU: {}, quotaSaid: {}, mrev: {}, mlost: {}, revOpen: 0, revTake: 0, sub: 0, cost: 0, gmv: 0, servedV: 0, lostV: 0, inV: 0, missV: 0,
+    cold: 0, util: 0, surge: 1, mult: 1, burstMult: 1, bursts: 0, limit: false, limitAll: false, limitTicks: 0, dz: 0, kc: {} };
+  for (const k of CUST) D.kc[k.id] = { paid: 0, rev: 0, img: { s: 0, l: 0 }, vid: { s: 0, l: 0 }, aud: { s: 0, l: 0 } };
+  Q = {}; lat = {}; for (const m of CATALOG) { Q[m.id] = []; lat[m.id] = []; }
+  QB = { img: [], vid: [] }; chart = [];
+  gpus = gpus.filter(g => g.kind !== 'burst'); gpus.forEach(g => { if (g.state === 'down') g.state = 'off'; g.slow = false; });
+  if ($('limit')) $('limit').setAttribute('aria-pressed', false);
+}
+function setupDay() {
+  newDay();
+  const ev = EVENTS[G.day - 1]; ev.setup && ev.setup();
+  for (const m of CATALOG) {
+    if (m.removeDay === G.day) G.listed.delete(m.id);
+    if (m.day === G.day && m.gate) G.avail[m.id] = G.rep >= m.gate ? G.day : G.day + 1;
+  }
+}
+function setListed(m, on) {
+  if (on) { G.listed.add(m.id); if (m.kind === 'open' && P.minWarm[m.id] == null) P.minWarm[m.id] = 2; }
+  else { G.listed.delete(m.id); if (m.kind === 'open') P.minWarm[m.id] = 0; }
+}
+function openDay() {
+  D.dz = CATALOG.filter(m => m.day === G.day && isListed(m)).length;
+  running = true;
+}
+function showCard(view) { cardView = view; view(); $('veil').hidden = false; try { window.scrollTo(0, 0); } catch (e) {} }
+function morning() {
+  setupDay();
+  const i = G.day - 1, ev = EVENTS[i];
+  const choices = ev.choices || null;
+  const offers = UPG.filter(u => !G.up[u.id]).sort(() => Math.random() - .5).slice(0, 3);
+  let chosen = choices ? false : true;
+  const draw = () => {
+    const tx = tr().ev[i], ux = tr().u;
+    const shelfModels = CATALOG.filter(m => G.day >= m.day && !removed(m));
+    const shelfHtml = CK.map(c => {
+      const ms = shelfModels.filter(m => m.cat === c); if (!ms.length) return '';
+      return ms.map(m => {
+        const on = isListed(m), av = availDay(m), canList = G.day >= av, isNew = m.day === G.day && G.day > 1;
+        let note = '';
+        if (isNew && m.gate) note = G.day >= av ? `<span class="note pos">${T('dz_ok')}</span>` : `<span class="note warn">${T('dz_no', { g: m.gate })}</span>`;
+        const econ = m.kind === 'open' ? T('price_x', { x: (m.rel * (isTurbo(m) ? 1.15 : 1)).toFixed(2) }) : T('cut', { x: Math.round(m.take * 100) });
+        const btn = on ? `<button class="on" data-unl="${m.id}">${T('listed')} · ${T('unlist')}</button>` : `<button data-lst="${m.id}" ${canList ? '' : 'disabled'}>${canList ? T('list') : T('from_day', { d: av })}</button>`;
+        return `<div class="srow ${m.kind}" style="--c:var(--${m.cat})"><div><b>${m.name}</b> <span class="bdg ${m.kind === 'closed' ? 'closed' : ''}">${T(isTurbo(m) ? 'k_turbo' : 'k_' + m.kind)}</span>${isNew ? ` <span class="bdg new">${T('k_new')}</span>` : ''}
+          <div class="meta">${m.lab} · ${T('c_' + m.cat)} · ${T('q', { q: m.q })} · ${econ}</div></div>${btn}${note}</div>`;
+      }).join('');
+    }).join('');
+    const turboable = CATALOG.filter(m => m.coDev && isListed(m) && !G.turbo[m.id]);
+    const wip = CATALOG.filter(m => G.turbo[m.id] && G.day < G.turbo[m.id]);
+    const projHtml = (turboable.length || wip.length) ? `<h3>${T('proj')}</h3><div class="opts">${turboable.map(m => `<button class="opt" data-tb="${m.id}" ${G.cash < TURBO_COST ? 'disabled' : ''}><b>${T('turbo', { m: m.name, lab: m.lab })}</b><small>${T('turbo_d')}</small><span class="cost">${money(TURBO_COST)}</span></button>`).join('')}${wip.map(m => `<button class="opt picked" disabled><b>${T('turbo', { m: m.name, lab: m.lab })}</b><small>${T('turbo_wip', { d: G.turbo[m.id] })}</small></button>`).join('')}</div>` : '';
+    $('card').innerHTML = `<div class="eyebrow">${T('m_eyebrow', { d: G.day, n: DAYS })}</div><h2>${tx.t}</h2><p>${tx.x}</p>${tx.s ? `<p class="src">${tx.s}</p>` : ''}
+      ${choices ? `<h3>${T('decide')}</h3><div class="opts">${choices.map((c, k) => `<button class="opt ${chosen === k ? 'picked' : ''}" data-c="${k}" ${chosen !== false ? 'disabled' : ''}><b>${tx.c[k][0]}</b><small>${tx.c[k][1]}</small></button>`).join('')}</div>` : ''}
+      <h3>${T('sh_title')}</h3><p class="hint" style="margin:0">${T('sh_hint')}</p><div class="shelf">${shelfHtml}</div>
+      ${projHtml}
+      <h3>${T('shop', { c: money(G.cash) })}</h3><div class="opts">${offers.length ? offers.map(u => `<button class="opt ${G.up[u.id] ? 'picked' : ''}" data-u="${u.id}" ${G.up[u.id] || G.cash < u.cost ? 'disabled' : ''}><b>${ux[u.id][0]}</b><small>${ux[u.id][1]}</small><span class="cost">${G.up[u.id] ? T('owned_tag') : money(u.cost)}</span></button>`).join('') : `<p class="hint">${T('allbought')}</p>`}</div>
+      <div class="row"><button class="primary" id="open" ${chosen === false ? 'disabled' : ''}>${T('open')}</button>${chosen === false ? `<span class="hint">${T('decidefirst')}</span>` : ''}</div>`;
+    $('card').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const k = +b.dataset.c; choices[k].fn(); chosen = k; draw(); renderHud(); });
+    $('card').querySelectorAll('[data-u]').forEach(b => b.onclick = () => buy(UPG.find(u => u.id === b.dataset.u), draw));
+    $('card').querySelectorAll('[data-lst]').forEach(b => b.onclick = () => { setListed(MI[b.dataset.lst], true); draw(); buildShelf(); });
+    $('card').querySelectorAll('[data-unl]').forEach(b => b.onclick = () => { setListed(MI[b.dataset.unl], false); draw(); buildShelf(); });
+    $('card').querySelectorAll('[data-tb]').forEach(b => b.onclick = () => { if (G.cash < TURBO_COST) return; G.cash -= TURBO_COST; G.turbo[b.dataset.tb] = G.day + 1; draw(); renderHud(); });
+    $('open').onclick = () => { $('veil').hidden = true; cardView = null; openDay(); setPaused(false); say(() => tr().ev[i].t); buildShelf(); };
+  };
+  showCard(draw); buildShelf(); renderHud(); render();
+}
+function buy(u, redraw) {
+  if (G.cash < u.cost || G.up[u.id]) return;
+  G.cash -= u.cost; G.up[u.id] = true;
+  if (u.id === 'deal') for (let i = 0; i < 30; i++) gpus.push(mk('own', RATE.contract));
+  if (u.id === 'devprog') { G.rep = Math.min(100, G.rep + 8); G.selfMult *= 1.1; }
+  renderOwned(); redraw(); renderHud(); buildGrid();
+}
+function renderOwned() { const ups = UPG.filter(x => G.up[x.id]); $('owned').innerHTML = ups.length ? ups.map(x => `<span>${tr().u[x.id][0]}</span>`).join('') : `<span>${T('none')}</span>`; }
+function endDay() {
+  running = false; setPaused(true);
+  const loss = D.lostV / Math.max(1, D.lostV + D.servedV), cov = D.inV / Math.max(1, D.inV + D.missV);
+  const lim = D.limitTicks / DAY;
+  const repD = Math.max(-12, Math.min(10, Math.round(1 - 60 * loss - 4 * lim + 2 * Math.min(2, D.dz) - (cov < .8 ? Math.round(12 * (.8 - cov)) : 0))));
+  const rev = D.revOpen + D.revTake + D.sub, profit = rev - D.cost;
+  G.cash += profit; G.rep = Math.max(0, Math.min(100, G.rep + repD));
+  // strict customers judge reliability in their main category
+  const notes = [];
+  for (const k of CUST) {
+    if (!k.strict || !G.act[k.id]) continue;
+    const x = D.kc[k.id][k.strict], share = x.l / Math.max(1e-9, x.l + x.s);
+    if (x.l + x.s > 0 && share > .05) {
+      G.strikes[k.id] = (G.strikes[k.id] || 0) + 1;
+      if (G.strikes[k.id] >= 2) { G.act[k.id] = false; notes.push(['ev_churn', k.id]); } else notes.push(['ev_strike', k.id, k.strict, G.strikes[k.id]]);
+    }
+  }
+  const custRev = Object.fromEntries(CUST.map(k => [k.id, D.kc[k.id].rev]));
+  G.hist.push({ rev, profit, gmv: D.gmv, cost: D.cost, custRev, loss, cov, mlost: { ...D.mlost }, mrev: { ...D.mrev }, open: D.revOpen, take: D.revTake, sub: D.sub, util: D.util, cold: D.cold });
+  const E = { day: G.day, open: D.revOpen, take: D.revTake, sub: D.sub, rent: D.cost, profit, gmv: D.gmv, cov, loss, cold: D.cold, repD, rep: G.rep, cash: G.cash, notes,
+    tip: loss > .06 ? 't_loss' : cov < .7 ? 't_cov' : D.util < .3 ? 't_util' : D.cold > 450 ? 't_cold' : 't_ok', broke: G.cash < -20000, last: G.day >= DAYS };
+  showCard(() => {
+    const rows = [[T('r_open'), money(E.open)], [T('r_take'), money(E.take)], [T('r_sub'), money(E.sub)], [T('r_rent'), money(-E.rent)],
+      [T('r_profit'), `<b class="${E.profit < 0 ? 'neg' : 'pos'}">${money(E.profit)}</b>`], [T('r_gmv'), money(E.gmv)], [T('r_cov'), pctf(E.cov)], [T('r_loss'), (E.loss * 100).toFixed(1) + '%'], [T('r_cold'), E.cold],
+      [T('r_rep'), (E.repD >= 0 ? '+' : '') + E.repD + ' → ' + Math.round(E.rep)], [T('r_cash'), money(E.cash)]];
+    const nt = E.notes.map(n => `<p class="warn">${T(n[0], { c: tr().cn[n[1]], cat: n[2] ? T('c_' + n[2]) : '', n: n[3] })}</p>`).join('');
+    $('card').innerHTML = `<div class="eyebrow">${T('e_eyebrow', { d: E.day })}</div><h2>${T(E.profit >= 0 ? 'made' : 'lost', { x: money(Math.abs(E.profit)) })}</h2>${nt}
+      <table class="rep"><tbody>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</tbody></table>
+      <p class="hint">${T(E.tip)}</p><div class="row"><button class="primary" id="go">${T(E.broke ? 'go_broke' : E.last ? 'go_last' : 'go_next')}</button></div>`;
+    $('go').onclick = () => { if (E.broke || E.last) return finale(E.broke); G.day++; morning(); };
+  });
+  renderHud();
+}
+function valuation(broke) {
+  const last3 = G.hist.slice(-3), n = Math.max(1, last3.length);
+  const arr = last3.reduce((a, h) => a + h.rev, 0) / n * 365;
+  const gm = last3.reduce((a, h) => a + h.rev - h.cost, 0) / Math.max(1, last3.reduce((a, h) => a + h.gmv, 0));
+  const cr = {}; let tot = 0; for (const h of last3) for (const [k, v] of Object.entries(h.custRev)) { tot += v; if (k !== 'self') cr[k] = (cr[k] || 0) + v; }
+  const top = Math.max(0, ...Object.values(cr)) / Math.max(1, tot);
+  const nx = CATALOG.filter(m => isTurbo(m) || (G.turbo[m.id] && G.turbo[m.id] <= G.day + 1)).length;
+  const parts = [['f_base', 4], ['f_rep', +(G.rep / 12).toFixed(1)], ['f_excl', 2.5 * nx], ['f_margin', gm > .2 ? 2 : gm > .1 ? 1 : 0], ['f_conc', top > .3 ? -3 : 0]];
+  const mult = Math.max(1, parts.reduce((a, p) => a + p[1], 0));
+  return { arr, gm, top, nx, parts, mult, val: broke ? 0 : arr * mult };
+}
+function finale(broke) {
+  const V = valuation(broke);
+  let best = 0; try { best = +localStorage.getItem('gpuhotel-mkt-best') || 0; if (V.val > best) localStorage.setItem('gpuhotel-mkt-best', Math.round(V.val)); } catch (e) {}
+  const rank = broke ? 'rank_broke' : V.val > 130e6 ? 'rank1' : V.val > 80e6 ? 'rank2' : V.val > 45e6 ? 'rank3' : 'rank4';
+  const F = { ...V, best: Math.max(best, V.val), rep: Math.round(G.rep), profit7: G.hist.reduce((a, h) => a + h.profit, 0), cash: G.cash };
+  showCard(() => {
+    const lbl = { f_base: T('f_base'), f_rep: T('f_rep', { r: F.rep }), f_excl: T('f_excl', { n: F.nx }), f_margin: T('f_margin', { p: pctf(F.gm) }), f_conc: T('f_conc', { p: pctf(F.top) }) };
+    $('card').innerHTML = `<div class="eyebrow">${T('f_eyebrow')}</div><h2>${T(rank)}</h2><div class="big">${money(F.val)}</div>
+      <table class="rep"><tbody><tr><td>${T('f_arr')}</td><td>${money(F.arr)}</td></tr>
+      ${F.parts.map(p => `<tr><td>${lbl[p[0]]}</td><td>${p[1] >= 0 ? '+' : ''}${p[1]}×</td></tr>`).join('')}
+      <tr><td><b>${T('f_mult')}</b></td><td><b>${F.mult.toFixed(1)}×</b></td></tr>
+      <tr><td>${T('f_profit')}</td><td>${money(F.profit7)}</td></tr><tr><td>${T('f_cash')}</td><td>${money(F.cash)}</td></tr><tr><td>${T('f_best')}</td><td>${money(F.best)}</td></tr></tbody></table>
+      <p class="src">${T('f_note')}</p>
+      <div class="row"><button class="primary" id="again">${T('again')}</button></div>`;
+    $('again').onclick = () => location.reload();
+  });
+}
+
+// ================= UI =================
+let cells = [];
+function buildGrid() { $('grid').innerHTML = ''; cells = gpus.map(() => { const d = document.createElement('div'); d.className = 'w'; $('grid').appendChild(d); return d; }); }
+function buildShelf() {
+  const listed = CATALOG.filter(isListed);
+  $('shelf').innerHTML = `<h2>${T('shelf')}</h2>` + CK.map(c => {
+    const ms = listed.filter(m => m.cat === c);
+    return `<div class="catgrp" style="--c:var(--${c})"><h3>${T('c_' + c)}</h3>${ms.length ? ms.map(m => `<div class="mrow ${m.kind}" style="--c:var(--${c})">
+      <div class="mhead"><b>${m.name}</b><small>${m.lab}</small><span class="bdg ${m.kind === 'closed' ? 'closed' : isTurbo(m) ? 'turbo' : ''}">${T(isTurbo(m) ? 'k_turbo' : 'k_' + m.kind)}</span></div>
+      <div class="stat"><div class="qbar"><i id="qb-${m.id}"></i></div><div class="nums" id="mn-${m.id}"></div></div>
+      ${m.kind === 'open' ? `<div class="ctl"><label for="mw-${m.id}">${T('mw')}</label><input type="range" id="mw-${m.id}" min="0" max="60" value="${P.minWarm[m.id] || 0}"><output id="o-mw-${m.id}"></output></div>` : ''}</div>`).join('') : `<p class="hint">${T('shelf_none')}</p>`}</div>`;
+  }).join('');
+  sync();
+}
+function sync() {
+  for (const m of openListed()) { const el = $('mw-' + m.id); if (!el) continue; P.minWarm[m.id] = +el.value; $('o-mw-' + m.id).textContent = P.minWarm[m.id]; }
+  P.keep = +$('keep').value; P.win = $('win').value / 100; P.surge = $('surge').value / 100; P.policy = $('policy').value;
+  $('o-keep').textContent = P.keep + 's'; $('o-win').textContent = Math.round(P.win * 100) + '%'; $('o-surge').textContent = '×' + P.surge.toFixed(1);
+}
+document.addEventListener('input', sync);
+function setPaused(v) { paused = v; $('pause').setAttribute('aria-pressed', v); $('pause').textContent = T(v ? 'resume' : 'pause'); }
+$('pause').onclick = () => { if (running) setPaused(!paused); };
+document.querySelectorAll('.spd').forEach(b => b.onclick = () => { speed = +b.dataset.s; document.querySelectorAll('.spd').forEach(x => x.setAttribute('aria-pressed', x === b)); });
+$('burst').onclick = () => {
+  if (!running || D.bursts >= 3) return; D.bursts++;
+  const p = (RATE.burst * D.burstMult).toFixed(1);
+  for (let i = 0; i < 10; i++) { const g = mk('burst', RATE.burst * D.burstMult); g.state = 'down'; g.until = t + 45; gpus.push(g); }
+  buildGrid(); say(() => T('b_msg', { p }));
+};
+$('limit').onclick = () => { if (!running) return; D.limit = !D.limit; $('limit').setAttribute('aria-pressed', D.limit); const on = D.limit; say(() => T(on ? 'l_on' : 'l_off')); };
+
+// language picker
+function buildMenu() {
+  $('langMenu').innerHTML = LANGS.map(([id, code, name]) => `<button role="menuitemradio" aria-checked="${id === lang}" data-l="${id}"><span>${name}</span><small>${code}</small></button>`).join('');
+  $('langMenu').querySelectorAll('[data-l]').forEach(b => b.onclick = () => { setLang(b.dataset.l); closeMenu(); $('langBtn').focus(); });
+}
+function openMenu() { buildMenu(); $('langMenu').hidden = false; $('langBtn').setAttribute('aria-expanded', 'true'); const cur = $('langMenu').querySelector('[aria-checked="true"]'); cur && cur.focus(); }
+function closeMenu() { $('langMenu').hidden = true; $('langBtn').setAttribute('aria-expanded', 'false'); }
+$('langBtn').onclick = e => { e.stopPropagation(); $('langMenu').hidden ? openMenu() : closeMenu(); };
+document.addEventListener('click', e => { if (!$('langMenu').hidden && !e.target.closest('.lang')) closeMenu(); });
+document.addEventListener('keydown', e => {
+  if ($('langMenu').hidden) return;
+  if (e.key === 'Escape') { closeMenu(); $('langBtn').focus(); }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); const items = [...$('langMenu').querySelectorAll('button')], k = items.indexOf(document.activeElement);
+    items[(k + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus();
+  }
+});
+function setLang(id) { lang = L[id] ? id : 'en'; try { localStorage.setItem('gpuhotel-lang', lang); } catch (e) {} applyLang(); }
+function applyLang() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+  $('langCode').textContent = LANGS.find(l => l[0] === lang)[1];
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = T(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-aria]').forEach(el => el.setAttribute('aria-label', T(el.dataset.i18nAria)));
+  $('basis').innerHTML = `<thead><tr>${T('bcols').map(x => `<td>${x}</td>`).join('')}</tr></thead><tbody>${T('brows').map(r => `<tr>${r.map(x => `<td>${x}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  setPaused(paused); renderOwned(); buildShelf();
+  if (lastSay) $('ticker').textContent = lastSay();
+  if (!$('veil').hidden && cardView) cardView();
+  if (D) render();
+}
+
+const cv = $('chart'), cx = cv.getContext('2d');
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const COL = { img: css('--img'), vid: css('--vid'), aud: css('--aud'), rule: css('--rule'), muted: css('--muted') };
+function drawChart() {
+  const W = cv.width, H = cv.height, pad = 40, top = Math.max(100, gpus.length); cx.clearRect(0, 0, W, H);
+  cx.font = '20px sans-serif'; cx.fillStyle = COL.muted; cx.strokeStyle = COL.rule; cx.lineWidth = 1;
+  const y = v => H - 8 - (H - 22) * v / top, x = i => pad + (W - pad) * i / (DAY / 6);
+  for (const v of [0, 50, 100]) { cx.beginPath(); cx.moveTo(pad, y(v)); cx.lineTo(W, y(v)); cx.stroke(); cx.fillText(v, 0, y(v) + 6); }
+  if (chart.length < 2) return;
+  const base = chart.map(() => 0);
+  CK.forEach((c, k) => {
+    cx.beginPath(); chart.forEach((h, i) => cx.lineTo(x(i), y(base[i] + h[k])));
+    for (let i = chart.length - 1; i >= 0; i--) cx.lineTo(x(i), y(base[i]));
+    cx.closePath(); cx.fillStyle = COL[c]; cx.globalAlpha = .85; cx.fill(); cx.globalAlpha = 1;
+    chart.forEach((h, i) => base[i] += h[k]);
+  });
+  cx.beginPath(); chart.forEach((h, i) => cx.lineTo(x(i), y(h[3]))); cx.strokeStyle = COL.muted; cx.setLineDash([6, 6]); cx.lineWidth = 2; cx.stroke(); cx.setLineDash([]);
+}
+function renderCust() {
+  const tot = CUST.reduce((a, k) => a + D.kc[k.id].rev, 0);
+  const uses = k => CK.filter(c => k.f[c]).map(c => T('c_' + c)).join(', ');
+  const st = k => !G.act[k.id] ? (G.gone === k.id ? 'st_gone' : 'st_churn') : G.pm[k.id] ? 'st_deal' : G.strikes[k.id] ? 'st_strike' : 'st_active';
+  const cols = T('ccols');
+  $('ctab').innerHTML = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${CUST.map(k => {
+    const K = D.kc[k.id], s = st(k);
+    return `<tr><td>${tr().cn[k.id]}</td><td>${uses(k)}</td><td class="n">${money(K.paid)}</td><td class="n">${money(K.rev)} <span style="color:var(--muted)">${tot > 0 ? pctf(K.rev / tot) : ''}</span></td><td class="${s === 'st_churn' || s === 'st_gone' ? 'neg' : s === 'st_strike' || s === 'st_deal' ? 'warn' : ''}">${T(s)}</td></tr>`;
+  }).join('')}</tbody>`;
+}
+function renderHud() {
+  $('k-day').textContent = T('day', { n: G.day });
+  const hh = D.t / DAY * 24, time = `${String(Math.floor(hh) % 24).padStart(2, '0')}:${String(Math.floor(hh % 1 * 60)).padStart(2, '0')}`;
+  $('k-clock').textContent = T('clock', { time, n: DAYS });
+  const today = D.revOpen + D.revTake + D.sub - D.cost;
+  $('k-cash').textContent = money(G.cash + (running ? today : 0)); $('k-cash').className = G.cash + today < 0 ? 'neg' : '';
+  $('k-today').textContent = money(today); $('k-today').className = today < 0 ? 'neg' : 'pos';
+  $('k-rep').textContent = Math.round(G.rep);
+  const cov = D.inV + D.missV > 0 ? D.inV / (D.inV + D.missV) : 1;
+  $('k-cov').textContent = pctf(cov); $('k-cov').className = cov < .7 ? 'warn' : '';
+  $('k-lost').textContent = (D.lostV / Math.max(1, D.lostV + D.servedV) * 100).toFixed(1) + '%';
+  $('dayline').style.width = D.t / DAY * 100 + '%';
+  $('burst').disabled = !running || D.bursts >= 3;
+  $('burst-hint').textContent = T('bhint', { b: (RATE.burst * D.burstMult).toFixed(1), o: RATE.own, s: RATE.sublet * (G.up.spot ? 2 : 1), n: 3 - D.bursts });
+}
+function render() {
+  if (cells.length !== gpus.length) buildGrid();
+  gpus.forEach((g, i) => { const m = g.m && MI[g.m]; const c = 'w ' + (g.state === 'off' ? '' : g.state === 'down' ? 'down' : g.state + ' ' + (m ? m.cat : '')) + (g.lane ? ' lane' : '') + (g.kind === 'burst' ? ' burst' : '') + (g.slow ? ' slow' : '') + (m && isTurbo(m) ? ' tb' : ''); if (cells[i].className !== c) cells[i].className = c; });
+  // share of each category's market demand that each listed model is catching right now
+  for (const c of CK) {
+    const mkt = CATALOG.filter(m => m.cat === c && inMarket(m)), SA = mkt.reduce((a, m) => a + attract(m), 0);
+    for (const m of mkt) {
+      if (!isListed(m) || !$('mn-' + m.id)) continue;
+      const share = SA ? pctf(attract(m) / SA) : '0%', q = Q[m.id] || [], p95 = pct(lat[m.id], .95), rev = money(D.mrev[m.id] || 0);
+      if (m.kind === 'open') { $('qb-' + m.id).style.width = Math.min(100, q.length / (m.batch * 12) * 100) + '%'; $('mn-' + m.id).innerHTML = T('row_open', { share, cat: T('c_' + c), q: q.length, p: p95, r: cnt(m.id), rev }); }
+      else { const u = D.capT[m.id] ? Math.min(1, (D.capU[m.id] || 0) / D.capT[m.id]) : 0; $('qb-' + m.id).style.width = (q.length ? 100 : u * 100) + '%'; $('mn-' + m.id).innerHTML = T('row_closed', { share, cat: T('c_' + c), u: pctf(u), p: p95, rev }); }
+    }
+  }
+  renderCust(); renderHud(); drawChart();
+}
+setInterval(() => { if (!paused && running) for (let i = 0; i < speed && running; i++) step(); }, 80);
+setInterval(render, 200);
+// headless balance hook: plays every day with a fixed strategy
+window.__auto = (o = {}) => {
+  for (; G.day <= DAYS; G.day++) {
+    setupDay();
+    for (const m of CATALOG) if (o.listAll && G.day >= availDay(m) && !removed(m) && !isListed(m) && !(o.skip || []).includes(m.id)) setListed(m, true);
+    for (const id of o.turbo || []) if (!G.turbo[id] && isListed(MI[id]) && G.cash >= TURBO_COST) { G.cash -= TURBO_COST; G.turbo[id] = G.day + 1; }
+    for (const u of o.ups || []) { const U = UPG.find(x => x.id === u); if (U && !G.up[u] && G.cash >= U.cost) { G.cash -= U.cost; G.up[u] = true; if (u === 'deal') for (let i = 0; i < 30; i++) gpus.push(mk('own', RATE.contract)); if (u === 'devprog') { G.rep = Math.min(100, G.rep + 8); G.selfMult *= 1.1; } } }
+    for (const m of openListed()) if (P.minWarm[m.id] == null) P.minWarm[m.id] = 2;
+    if (o.mw) Object.assign(P.minWarm, o.mw);
+    const ev = EVENTS[G.day - 1]; if (ev.choices) ev.choices[o.pick ? o.pick(G.day) : 1].fn();
+    openDay(); while (running) step();
+    if (G.cash < -20000) return { broke: true, hist: G.hist, rep: G.rep };
+  }
+  G.day = DAYS; const V = valuation(false);
+  return { cash: G.cash, rep: G.rep, hist: G.hist, V };
+};
+applyLang();
+morning();
+</script>
+</body>
+</html>
