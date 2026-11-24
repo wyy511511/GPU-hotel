@@ -2,7 +2,7 @@
 
 Browser games about inference economics. You run a hotel with 100 GPUs: models are room types, loading a model is prepping a room, and every request is a guest checking in.
 
-Open either file in a browser. No build step and no dependencies beyond Google Fonts. Both are in English, Español, Français, Türkçe and 中文 (picker in the top-right corner).
+Play online: https://wyy511511.github.io/GPU-hotel/ (Model Marketplace) and https://wyy511511.github.io/GPU-hotel/classic.html (classic). Or open either file in a browser. No build step and no dependencies beyond Google Fonts. Both are in English, Español, Français, Türkçe and 中文 (picker in the top-right corner).
 
 ## `index.html`: Model Marketplace
 
